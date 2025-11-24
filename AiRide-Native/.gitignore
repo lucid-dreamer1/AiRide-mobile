@@ -1,0 +1,4 @@
+# Ignore root Node files
+package.json
+package-lock.json
+node_modules/
