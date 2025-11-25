@@ -188,44 +188,45 @@ export default function HomeScreen() {
   // STREAM ISTRUZIONI
   // -----------------------------
   const handleSend = async () => {
-  if (!destination.trim()) return;
-  if (!currentPosition) return;
+    if (!destination.trim()) return;
+    if (!currentPosition) return;
 
-  // ⛔ CASCO OBBLIGATORIO
-  if (!connected) {
-    alert("Connetti prima il casco.");
-    try {
-      await scanAndConnect();
-    } catch {
-      return; // se fallisce → STOP
-    }
-    if (!connected) return;
-  }
-
-  try {
-    const start = currentPosition;
-
-    // ⭐ AVVIA DEMO SOLO DOPO CHE IL CASCO È CONNESSO
-    setDemoActive(true);
-    setDemoFinished(false);
-
-    setShowInstructionCard(true);
-
-    if (streamRef.current?.close) streamRef.current.close();
-
-    streamRef.current = openInstructionStream(
-      `${start.latitude},${start.longitude}`,
-      destination,
-      async (msg: any) => {
-        const testo = msg?.testo || msg?.text || msg?.instruction || "Istruzione";
-        const metri = msg?.metri || msg?.distance || 0;
-        const freccia = msg?.freccia || msg?.arrow || 0;
-
-        setCurrentInstruction({ testo, metri, freccia, next: msg?.next });
+    // ⛔ CASCO OBBLIGATORIO
+    if (!connected) {
+      alert("Connetti prima il casco.");
+      try {
+        await scanAndConnect();
+      } catch {
+        return; // se fallisce → STOP
       }
-    );
-  } catch (err) {}
-};
+      if (!connected) return;
+    }
+
+    try {
+      const start = currentPosition;
+
+      // ⭐ AVVIA DEMO SOLO DOPO CHE IL CASCO È CONNESSO
+      setDemoActive(true);
+      setDemoFinished(false);
+
+      setShowInstructionCard(true);
+
+      if (streamRef.current?.close) streamRef.current.close();
+
+      streamRef.current = openInstructionStream(
+        `${start.latitude},${start.longitude}`,
+        destination,
+        async (msg: any) => {
+          const testo =
+            msg?.testo || msg?.text || msg?.instruction || "Istruzione";
+          const metri = msg?.metri || msg?.distance || 0;
+          const freccia = msg?.freccia || msg?.arrow || 0;
+
+          setCurrentInstruction({ testo, metri, freccia, next: msg?.next });
+        }
+      );
+    } catch (err) {}
+  };
 
   // -----------------------------------------
   // AGGIORNA istruzioni e metri + BLE ogni 50m
@@ -243,25 +244,28 @@ export default function HomeScreen() {
           <Text style={styles.demoLabel}>Velocità DEMO</Text>
 
           <View style={styles.demoButtons}>
-            {[0.5, 1, 3, 5].map((s) => (
-              <TouchableOpacity
-                key={s}
-                style={[
-                  styles.demoButton,
-                  demoSpeed === s && styles.demoButtonActive,
-                ]}
-                onPress={() => setDemoSpeed(s)}
-              >
-                <Text
+            {["0.5", "1", "3", "5"].map((val) => {
+              const s = Number(val);
+              return (
+                <TouchableOpacity
+                  key={val}
                   style={[
-                    styles.demoButtonText,
-                    demoSpeed === s && styles.demoButtonTextActive,
+                    styles.demoButton,
+                    demoSpeed === s && styles.demoButtonActive,
                   ]}
+                  onPress={() => setDemoSpeed(s)}
                 >
-                  {s}x
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.demoButtonText,
+                      demoSpeed === s && styles.demoButtonTextActive,
+                    ]}
+                  >
+                    {val}x
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       )}
@@ -338,8 +342,8 @@ export default function HomeScreen() {
           {connected
             ? "Casco connesso"
             : scanning
-              ? "Connessione al casco..."
-              : "Casco non connesso"}
+            ? "Connessione al casco..."
+            : "Casco non connesso"}
         </Text>
 
         {error ? <Text style={styles.bleStatusError}>{error}</Text> : null}
@@ -448,3 +452,11 @@ const styles = StyleSheet.create({
   },
   sendText: { color: "white", fontSize: 16, fontWeight: "600" },
 });
+console.error = (...args) => {
+  args = args.map(a => typeof a === "string" ? a : JSON.stringify(a));
+  console.log("[ERR]", ...args);
+};
+console.warn = (...args) => {
+  args = args.map(a => typeof a === "string" ? a : JSON.stringify(a));
+  console.log("[WARN]", ...args);
+};
