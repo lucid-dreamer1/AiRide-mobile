@@ -2,19 +2,21 @@
   "expo": {
     "name": "airide-native",
     "slug": "airide-native",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "airidenative",
+    "scheme": "com.anonymous.airidenative",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-
-    "platforms": ["android"],
-
+    "platforms": [
+      "android",
+      "ios"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.airidenative",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
-
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -25,6 +27,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.airidenative",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "BLUETOOTH",
         "BLUETOOTH_ADMIN",
@@ -38,20 +41,35 @@
         }
       }
     },
-
     "web": {
+      "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-
     "updates": {
       "enabled": true,
       "fallbackToCacheTimeout": 0,
       "url": "https://u.expo.dev/6908c5a1-8591-4c33-970a-19d11ff5f955"
     },
-
     "plugins": [
       "expo-router",
+      "@react-native-firebase/app",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraDependencies": [
+              "com.google.android.gms:play-services-auth:20.7.0"
+            ],
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "minSdkVersion": 24
+          },
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -67,25 +85,25 @@
       [
         "react-native-ble-plx",
         {
-          "isBackgroundEnabled": false,
-          "modes": ["central"],
+          "isBackgroundEnabled": true,
+          "modes": [
+            "central"
+          ],
           "bluetoothAlwaysPermission": "L'app vuole connettersi a dispositivi Bluetooth"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-
     "extra": {
       "router": {},
       "eas": {
         "projectId": "6908c5a1-8591-4c33-970a-19d11ff5f955"
       }
     },
-
     "runtimeVersion": {
       "policy": "appVersion"
     }

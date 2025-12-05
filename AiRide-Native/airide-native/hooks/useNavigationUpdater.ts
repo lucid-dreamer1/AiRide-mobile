@@ -1,3 +1,4 @@
+// AiRide-Native/airide-native/hooks/useNavigationUpdater.ts
 import { useEffect, useRef } from "react";
 import { useHelmet } from "@/contexts/HelmetContext";
 
@@ -14,8 +15,8 @@ export default function useNavigationUpdater(
   instruction: NavInstruction | null,
   setInstruction: (i: NavInstruction | null) => void
 ): void {
-  const { sendToHelmet } = useHelmet();
-
+  const { sendToHelmet, connected } = useHelmet();
+  if (!connected) return;
   // 👇 evita spam BLE (HM-10 si blocca se arrivano troppi pacchetti)
   const lastSent = useRef<number>(0);
 
@@ -33,7 +34,10 @@ export default function useNavigationUpdater(
         lastSent.current = now;
 
         // HM-10: max 20 bytes -> testo corto
-        const shortText = (instruction.testo || instruction.text || "").slice(0, 10);
+        const shortText = (instruction.testo || instruction.text || "").slice(
+          0,
+          10
+        );
 
         // Pacchetto SICURO
         const packet = `${instruction.freccia}|${dist}|${shortText}`;

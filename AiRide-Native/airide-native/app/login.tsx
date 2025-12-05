@@ -1,3 +1,4 @@
+// app/login.tsx
 import { useState } from "react";
 import {
   View,
@@ -8,18 +9,19 @@ import {
 } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../services/firebaseConfig";
+import auth from "@react-native-firebase/auth";
+import { useGoogleAuth } from "../services/googleAuth";
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const { loginWithGoogle } = useGoogleAuth();
 
   const handleLogin = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push("/(tabs)");
+      await auth().signInWithEmailAndPassword(email, password);
+      router.push("./(tabs)");
     } catch (error: any) {
       alert(error.message);
     }
@@ -53,9 +55,36 @@ export default function LoginScreen() {
         <Text style={styles.buttonText}>Accedi</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        onPress={loginWithGoogle}
+        style={{
+          backgroundColor: "white",
+          borderWidth: 1,
+          borderColor: "#ccc",
+          paddingVertical: 14,
+          borderRadius: 16,
+          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "center",
+          marginBottom: 20,
+        }}
+      >
+        <Feather name="chrome" size={20} color="#E85A2A" />
+        <Text
+          style={{
+            marginLeft: 8,
+            fontSize: 16,
+            color: "#E85A2A",
+            fontWeight: "600",
+          }}
+        >
+          Continua con Google
+        </Text>
+      </TouchableOpacity>
+
       <Text style={styles.bottomText}>
         Non hai un account?
-        <Link href="/register" style={styles.link}>
+        <Link href="./register" style={styles.link}>
           {" "}
           Registrati
         </Link>
@@ -63,6 +92,9 @@ export default function LoginScreen() {
     </View>
   );
 }
+
+
+
 
 const styles = StyleSheet.create({
   container: {

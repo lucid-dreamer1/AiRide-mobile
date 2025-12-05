@@ -34,13 +34,19 @@ export async function updatePosition(lat: number, lon: number) {
 }
 
 // ======================================================
-// 📌 STREAM ISTRUZIONI (SSE PER REACT NATIVE)
+// 📌 STREAM ISTRUZIONI (SSE) — VERSIONE FIXATA
 // ======================================================
 export function openInstructionStream(
   start: string,
   end: string,
-  onMessage: (data: any) => void
+  onMessage: (data: any) => void,
+  skipIfNoHelmet: boolean = false
 ) {
+  if (skipIfNoHelmet) {
+    console.log("🔵 DEMO MODE: stream disattivato (nessun casco richiesto)");
+    return { close() {} };
+  }
+
   const url = `${BASE_URL}/stream?start=${encodeURIComponent(
     start
   )}&end=${encodeURIComponent(end)}`;
@@ -52,6 +58,15 @@ export function openInstructionStream(
   es.addEventListener("message", (event: any) => {
     try {
       const data = JSON.parse(event.data);
+
+      if (data?.error === "getRoute") {
+        console.log("❌ Stream chiuso: errore getRoute");
+        es.close();
+        return;
+      }
+
+      if (!data || typeof data !== "object") return;
+
       onMessage(data);
     } catch (e) {
       console.log("SSE parse error:", e);
@@ -59,8 +74,10 @@ export function openInstructionStream(
   });
 
   es.addEventListener("error", (err: any) => {
-    console.log("SSE error:", err);
+    console.log("SSE error → stream chiuso");
+    es.close();
   });
 
   return es;
 }
+

@@ -1,6 +1,6 @@
 ###############################################################
-# APP DI NAVIGAZIONE
-# Flask + TomTom API + SSE ISTRUZIONI (modalità DEMO senza auth)
+# APP DI NAVIGAZIONE — AirRide (versione corretta + migliorata)
+# Flask + TomTom API + SSE
 ###############################################################
 
 from flask import Flask, request, Response, jsonify
@@ -16,8 +16,6 @@ app = Flask(__name__)
 CORS(app)
 
 # Memoria temporanea:
-# - viaggi attivi per utente
-# - posizioni correnti per utente (usate dallo STREAM)
 active_sessions = {}
 current_positions = {}
 
@@ -40,36 +38,87 @@ def distanza_m(lat1, lon1, lat2, lon2):
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
 
-def geocode_address(address):
+def translate_instruction_to_italian(txt: str) -> str:
+    """Traduzioni base TomTom → italiano."""
+    if not txt:
+        return ""
+
+    t = txt.lower()
+
+    replacements = {
+        "turn right": "Svolta a destra",
+        "turn left": "Svolta a sinistra",
+        "keep right": "Mantieni la destra",
+        "keep left": "Mantieni la sinistra",
+        "go straight": "Prosegui dritto",
+        "continue straight": "Continua dritto",
+        "u-turn": "Fai inversione",
+        "at the roundabout": "Alla rotonda",
+        "take the": "Prendi la",
+        "exit": "uscita",
+    }
+
+    translated = txt
+    for eng, ita in replacements.items():
+        if eng in t:
+            translated = translated.replace(eng, ita)
+
+    return translated
+
+
+def geocode_address(address: str):
+    """Restituisce 'lat,lon' oppure None."""
     try:
         url = f"https://api.tomtom.com/search/2/geocode/{requests.utils.quote(address)}.json"
         params = {"key": API_KEY, "limit": 1}
         r = requests.get(url, params=params, timeout=10)
         data = r.json()
+
         if data.get("results"):
             pos = data["results"][0]["position"]
             return f"{pos['lat']},{pos['lon']}"
-    except Exception as e:
-        print("Errore geocoding:", e, address)
+    except:
+        pass
+
     return None
 
 
-def get_route_from_tomtom(start, end):
+def ensure_coordinates(value: str):
+    """
+    Se value è "lat,lon" → restituisce la stringa.
+    Se è un indirizzo → esegue geocoding.
+    """
     try:
-        start_lat, start_lon = map(float, start.split(","))
-        end_lat, end_lon = map(float, end.split(","))
-        url = f"https://api.tomtom.com/routing/1/calculateRoute/{start_lat},{start_lon}:{end_lat},{end_lon}/json"
+        lat, lon = map(float, value.split(","))
+        return value  # È già coordinate
+    except:
+        # Non era lat,lon → geocoding
+        coords = geocode_address(value)
+        return coords
+
+
+def get_route_from_tomtom(start: str, end: str):
+    """start e end DEVONO essere coordinate 'lat,lon'."""
+    try:
+        slat, slon = map(float, start.split(","))
+        elat, elon = map(float, end.split(","))
+
+        url = f"https://api.tomtom.com/routing/1/calculateRoute/{slat},{slon}:{elat},{elon}/json"
         params = {
             "key": API_KEY,
             "instructionsType": "text",
             "routeType": "fastest",
-            "traffic": "false"
+            "traffic": "false",
+            "language": "it-IT"
+
         }
         r = requests.get(url, params=params, timeout=10)
         if r.status_code != 200:
             print("Errore TomTom:", r.text)
             return None
+        
         return r.json()
+
     except Exception as e:
         print("Errore get_route_from_tomtom:", e)
         return None
@@ -77,47 +126,55 @@ def get_route_from_tomtom(start, end):
 
 def extract_instructions(resp_json):
     """
-    Estrae le istruzioni di guida dalla risposta TomTom.
-    Ritorna lista di dict: {text, lat, lon, dist}
+    Estrae le istruzioni TomTom in modo sicuro.
+    Restituisce lista: {text, lat, lon, dist, text_it}
     """
+    results = []
+
+    if not resp_json:
+        return results
+
     try:
         route = resp_json.get("routes", [{}])[0]
         legs = route.get("legs", [])
-        instructions = []
+
         for leg in legs:
             guidance = leg.get("guidance", {}) or route.get("guidance", {})
+
             for instr in guidance.get("instructions", []):
                 msg = instr.get("message", "")
                 lat = instr.get("point", {}).get("latitude")
                 lon = instr.get("point", {}).get("longitude")
                 dist = instr.get("routeOffsetInMeters", 0)
-                instructions.append({
+
+                results.append({
                     "text": msg,
+                    "text_it": translate_instruction_to_italian(msg),
                     "lat": lat,
                     "lon": lon,
-                    "dist": dist
+                    "dist": dist,
                 })
-        return instructions
+
     except Exception as e:
         print("Errore extract_instructions:", e)
-        return []
+
+    return results
 
 
 def manovra_to_freccia(text):
-    """Converte una descrizione testuale in un codice direzionale numerico."""
+    """Converte testo TomTom in codice direzionale."""
     t = (text or "").lower()
-    if any(k in t for k in ("destra", "right")):
-        return 0  # destra
-    if any(k in t for k in ("sinistra", "left")):
-        return 1  # sinistra
-    if any(k in t for k in ("dritto", "straight", "continua", "continue")):
-        return 2  # dritto
-    if any(k in t for k in ("u-turn", "inversione", "indietro")):
-        return 3  # inversione
-    return 2  # default: avanti
+    if "right" in t or "destra" in t:
+        return 0
+    if "left" in t or "sinistra" in t:
+        return 1
+    if "u-turn" in t or "inversione" in t:
+        return 3
+    return 2  # dritto default
+
 
 ###############################################################
-# UPDATE POSIZIONE GPS (DEMO: user fisso)
+# GPS UPDATE
 ###############################################################
 
 @app.route("/update_position", methods=["POST"])
@@ -128,48 +185,34 @@ def update_position():
             return jsonify({"error": "Lat e Lon mancanti"}), 400
 
         user_id = DEMO_USER_ID
-
         lat = float(data["lat"])
         lon = float(data["lon"])
-        current_time = datetime.utcnow()
 
         current_positions[user_id] = {
             "lat": lat,
             "lon": lon,
-            "time": time.time()
+            "time": time.time(),
         }
-        # Se esiste una rotta attiva → controlla uscita dal percorso
+
+        # Controllo fuori rotta
         session = active_sessions.get(user_id)
         if session and "polyline" in session:
             if fuori_rotta(lat, lon, session["polyline"]):
-                print("🚨 Utente fuori rotta: serve RICALCOLO")
                 session["recalc_needed"] = True
 
-        print(f"[GPS] UID={user_id} → {lat},{lon}")
-
-        if user_id not in active_sessions:
-            active_sessions[user_id] = {
-                "start": (lat, lon),
-                "start_time": current_time,
-            }
-            print(f"[{user_id}] 🟢 Inizio viaggio salvato")
-            return jsonify({"status": "start_logged"})
-
-        active_sessions[user_id]["last"] = (lat, lon)
         return jsonify({"status": "position_updated"})
 
     except Exception as e:
         print("Errore /update_position:", e)
-        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+
 ###############################################################
-# COMPLETAMENTO VIAGGIO (SOLO IN MEMORIA)
+# COMPLETAMENTO VIAGGIO
 ###############################################################
 
 @app.route("/complete_trip", methods=["POST"])
 def complete_trip():
-    """Chiamato quando il viaggio termina."""
     try:
         user_id = DEMO_USER_ID
 
@@ -177,25 +220,16 @@ def complete_trip():
         if not session:
             return jsonify({"error": "Nessun viaggio attivo"}), 400
 
-        end_time = datetime.utcnow()
-        duration_min = round((end_time - session["start_time"]).total_seconds() / 60, 1)
-        start_lat, start_lon = session["start"]
-        end_lat, end_lon = session.get("last", session["start"])
-
-        # Qui potresti salvare su file o DB in futuro
-        print(f"[{user_id}] 🏁 Viaggio completato:")
-        print(f"  Da ({start_lat},{start_lon}) a ({end_lat},{end_lon}) in {duration_min} min")
-
         del active_sessions[user_id]
         return jsonify({"status": "trip_saved"})
 
     except Exception as e:
         print("Errore /complete_trip:", e)
-        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+
 ###############################################################
-# ROUTE INFO (PER MAPPA / POLYLINE)
+# ROUTE INFO
 ###############################################################
 
 @app.route("/route_info")
@@ -203,31 +237,18 @@ def route_info():
     try:
         start = request.args.get("start")
         end = request.args.get("end")
+
         if not start or not end:
             return jsonify({"error": "Start o end mancanti"}), 400
 
-        # Start: se non è lat,lon → geocoding
-        try:
-            lat, lon = map(float, start.split(","))
-            start_coords = start
-        except:
-            start_coords = geocode_address(start)
+        start_coords = ensure_coordinates(start)
+        end_coords = ensure_coordinates(end)
 
-        if not start_coords:
-            return jsonify({"error": "Partenza non valida"}), 400
-
-        # End sempre via geocoding se è indirizzo
-        try:
-            end_lat, end_lon = map(float, end.split(","))
-            end_coords = end
-        except:
-            end_coords = geocode_address(end)
-
-        if not end_coords:
-            return jsonify({"error": "Destinazione non valida"}), 400
+        if not start_coords or not end_coords:
+            return jsonify({"error": "Geocoding fallito"}), 400
 
         route_data = get_route_from_tomtom(start_coords, end_coords)
-        if not route_data or not route_data.get("routes"):
+        if not route_data:
             return jsonify({"error": "Nessuna rotta trovata"}), 400
 
         route = route_data["routes"][0]
@@ -240,7 +261,7 @@ def route_info():
             for point in leg.get("points", []):
                 plat = point.get("latitude")
                 plon = point.get("longitude")
-                if plat is not None and plon is not None:
+                if plat and plon:
                     points.append({"lat": plat, "lon": plon})
 
         return jsonify({
@@ -251,11 +272,11 @@ def route_info():
 
     except Exception as e:
         print("Errore /route_info:", e)
-        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+
 ###############################################################
-# STREAMING ISTRUZIONI (SSE)
+# STREAM ISTRUZIONI (SSE)
 ###############################################################
 
 @app.route("/stream")
@@ -269,184 +290,105 @@ def stream():
         if not start or not end:
             return jsonify({"error": "Start o end mancanti"}), 400
 
-        # Gestione coordinate partenza
-        try:
-            lat, lon = map(float, start.split(","))
-            start_coords = start
-        except:
-            start_coords = geocode_address(start)
-
-        # Destinazione
-        try:
-            end_lat, end_lon = map(float, end.split(","))
-            end_coords = end
-        except:
-            end_coords = geocode_address(end)
+        # 🟢 FIX: convertiamo TUTTO in coordinate prima di routing
+        start_coords = ensure_coordinates(start)
+        end_coords = ensure_coordinates(end)
 
         if not start_coords or not end_coords:
-            return jsonify({"error": "Coordinate non valide"}), 400
+            return jsonify({"error": "Geocoding fallito"}), 400
 
-        # Ottieni rotta e istruzioni
         route_data = get_route_from_tomtom(start_coords, end_coords)
         if not route_data:
             return jsonify({"error": "Errore nel calcolo rotta"}), 400
 
         instructions = extract_instructions(route_data)
-        route = route_data["routes"][0]
+
+        # Polyline
         polyline = []
-        for leg in route.get("legs", []):
-            for point in leg.get("points", []):
-                latp = point.get("latitude")
-                lonp = point.get("longitude")
-                if latp and lonp:
-                    polyline.append({"lat": latp, "lon": lonp})
+        for leg in route_data["routes"][0].get("legs", []):
+            for p in leg.get("points", []):
+                polyline.append({"lat": p["latitude"], "lon": p["longitude"]})
 
         active_sessions[user_id] = {
             "polyline": polyline,
             "recalc_needed": False
-}
-        print(f"[STREAM] UID={user_id} → {len(instructions)} istruzioni")
+        }
 
         def generate():
-            instr_index = 0
+            yield f"data: {json.dumps({'testo': 'Navigazione avviata 🚗', 'fase': 'preview'})}\n\n"
 
-            yield f"data: {json.dumps({'testo': 'Navigazione avviata 🚗'})}\n\n"
+            idx = 0
 
             while True:
-                session = active_sessions.get(user_id)
                 pos = current_positions.get(user_id)
+                session = active_sessions.get(user_id)
 
                 if not pos:
                     yield ": waiting gps\n\n"
                     time.sleep(1)
                     continue
 
-                ###################################################
-                # 🔄 RICALCOLO SE NECESSARIO
-                ###################################################
+                # 🔄 RICALCOLO SE FUORI ROTTA
                 if session.get("recalc_needed"):
-                    yield f"data: {json.dumps({'testo': 'Ricalcolo percorso… 🔄'})}\n\n"
-
                     new_start = f"{pos['lat']},{pos['lon']}"
-                    route_data2 = get_route_from_tomtom(new_start, end_coords)
-                    instructions[:] = extract_instructions(route_data2)
+                    route2 = get_route_from_tomtom(new_start, end_coords)
+                    instructions[:] = extract_instructions(route2)
 
-                    # ricostruisci polyline
                     new_poly = []
-                    for leg in route_data2["routes"][0]["legs"]:
+                    for leg in route2["routes"][0]["legs"]:
                         for p in leg["points"]:
                             new_poly.append({"lat": p["latitude"], "lon": p["longitude"]})
-
                     session["polyline"] = new_poly
                     session["recalc_needed"] = False
-                    instr_index = 0
+                    idx = 0
                     continue
 
-                ###################################################
-                # Fine percorso
-                ###################################################
-                if instr_index >= len(instructions):
-                    yield f"data: {json.dumps({'testo': 'Percorso completato 🎉'})}\n\n"
+                if idx >= len(instructions):
+                    yield f"data: {json.dumps({'testo': 'Percorso completato 🎉', 'fase': 'complete'})}\n\n"
                     time.sleep(2)
                     continue
 
-                instr = instructions[instr_index]
+                instr = instructions[idx]
 
                 d = distanza_m(
                     pos["lat"], pos["lon"],
                     instr["lat"], instr["lon"]
                 )
 
-                trigger = 100      # soglia evidenziazione
-                step = 20          # quantizzazione nei 100m
-
-                # ✅ MOSTRA SEMPRE L’ISTRUZIONE CORRENTE
-                if d > trigger:
-                    # LONTANO → preview, metri “reali” arrotondati
-                    metri = int(d)
-                    payload = {
-                        "freccia": manovra_to_freccia(instr["text"]),
-                        "metri": metri,
-                        "testo": instr["text"],
-                        "near": False,        # 👈 preview
-                    }
+                # Definizione delle fasi
+                if d > 120:
+                    fase = "preview"
+                elif d > 70:
+                    fase = "prepare"
+                elif d > 25:
+                    fase = "near"
                 else:
-                    # VICINO → evidenziato, countdown a gradini (100,80,...,0)
-                    metri = int(round(d / step) * step)
-                    if metri < 0:
-                        metri = 0
+                    fase = "turn"
 
-                    payload = {
-                        "freccia": manovra_to_freccia(instr["text"]),
-                        "metri": metri,
-                        "testo": instr["text"],
-                        "near": True,         # 👈 da evidenziare
-                    }
+                # NEXT istruzione
+                next_instr = (
+                    instructions[idx + 1]
+                    if idx + 1 < len(instructions)
+                    else None
+                )
+
+                payload = {
+                    "testo": instr["text_it"],
+                    "metri": int(d),
+                    "freccia": manovra_to_freccia(instr["text_it"]),
+                    "fase": fase,
+                    "next": {
+                        "testo": next_instr["text_it"],
+                        "freccia": manovra_to_freccia(next_instr["text_it"]),
+                    } if next_instr else None
+                }
 
                 yield f"data: {json.dumps(payload)}\n\n"
 
-                # Quando sei molto vicino → passa alla prossima istruzione
                 if d < 20:
-                    instr_index += 1
+                    idx += 1
 
                 time.sleep(1)
-
-            instr_index = 0
-
-            # Messaggio iniziale
-            yield f"data: {json.dumps({'testo': 'Navigazione avviata 🚗'})}\n\n"
-
-            while instr_index < len(instructions):
-                instr = instructions[instr_index]
-
-                pos = current_positions.get(user_id)
-                if not pos:
-                    yield ": waiting gps\n\n"
-                    time.sleep(1)
-                    continue
-
-                # Distanza utente → punto istruzione
-                if instr["lat"] is not None and instr["lon"] is not None:
-                    d = distanza_m(
-                        pos["lat"], pos["lon"],
-                        instr["lat"], instr["lon"]
-                    )
-                else:
-                    d = 0
-
-                # ===============================
-                #     🔥 NUOVA LOGICA UPGRADE
-                # ===============================
-
-                trigger_distance = 100      # Mostra l’istruzione già a 100 metri
-                next_step_distance = 20     # Scala in multipli da 20 m
-
-                if d > trigger_distance:
-                    # Troppo lontano → solo tracking
-                    yield ": tracking\n\n"
-
-                else:
-                    # Quantizzazione della distanza: 100, 80, 60, 40, 20, 0
-                    metri_mostrati = int(round(d / next_step_distance) * next_step_distance)
-                    if metri_mostrati < 0:
-                        metri_mostrati = 0
-
-                    step_progressivo = {
-                        "freccia": manovra_to_freccia(instr["text"]),
-                        "metri": metri_mostrati,
-                        "testo": instr["text"]
-                    }
-
-                    yield f"data: {json.dumps(step_progressivo)}\n\n"
-
-                    # Quando sei molto vicino → passa alla prossima istruzione
-                    if d < 20:
-                        instr_index += 1
-
-                time.sleep(1)
-
-            # Fine percorso
-            yield f"data: {json.dumps({'testo': 'Percorso completato 🎉'})}\n\n"
 
         return Response(
             generate(),
@@ -457,106 +399,17 @@ def stream():
                 "Access-Control-Allow-Origin": "*"
             }
         )
-
     except Exception as e:
         print("Errore /stream:", e)
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-    try:
-        user_id = DEMO_USER_ID
-
-        start = request.args.get("start")
-        end = request.args.get("end")
-
-        if not start or not end:
-            return jsonify({"error": "Start o end mancanti"}), 400
-
-        # Gestione coordinate partenza
-        try:
-            lat, lon = map(float, start.split(","))
-            start_coords = start
-        except:
-            start_coords = geocode_address(start)
-
-        # Destinazione
-        try:
-            end_lat, end_lon = map(float, end.split(","))
-            end_coords = end
-        except:
-            end_coords = geocode_address(end)
-
-        if not start_coords or not end_coords:
-            return jsonify({"error": "Coordinate non valide"}), 400
-
-        # Ottieni rotta e istruzioni
-        route_data = get_route_from_tomtom(start_coords, end_coords)
-        if not route_data:
-            return jsonify({"error": "Errore nel calcolo rotta"}), 400
-
-        instructions = extract_instructions(route_data)
-        print(f"[STREAM] UID={user_id} → {len(instructions)} istruzioni")
-
-        def generate():
-            instr_index = 0
-
-            # Messaggio iniziale
-            yield f"data: {json.dumps({'testo': 'Navigazione avviata 🚗'})}\n\n"
-
-            while instr_index < len(instructions):
-                instr = instructions[instr_index]
-
-                step = {
-                    "freccia": manovra_to_freccia(instr["text"]),
-                    "metri": instr["dist"],
-                    "testo": instr["text"]
-                }
-
-                pos = current_positions.get(user_id)
-
-                if not pos:
-                    yield ": waiting gps\n\n"
-                    time.sleep(1)
-                    continue
-
-                if instr["lat"] is not None and instr["lon"] is not None:
-                    d = distanza_m(
-                        pos["lat"], pos["lon"],
-                        instr["lat"], instr["lon"]
-                    )
-                else:
-                    d = 0
-
-                if d < 70:
-                    yield f"data: {json.dumps(step)}\n\n"
-                    instr_index += 1
-                else:
-                    yield ": tracking\n\n"
-
-                time.sleep(1)
-
-            yield f"data: {json.dumps({'testo': 'Percorso completato 🎉'})}\n\n"
-
-        return Response(
-            generate(),
-            mimetype="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "Access-Control-Allow-Origin": "*"
-            }
-        )
-
-    except Exception as e:
-        print("Errore /stream:", e)
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
 
 ###############################################################
-# AVVIO SERVER
+# FUNZIONI FUORI ROTTA
 ###############################################################
+
 def distanza_punto_segmento(p, a, b):
-    """Calcola distanza minima tra punto p e segmento AB."""
     px, py = p
     ax, ay = a
     bx, by = b
@@ -574,9 +427,7 @@ def distanza_punto_segmento(p, a, b):
 
 
 def fuori_rotta(user_lat, user_lon, polyline, soglia=30):
-    """Ritorna True se il punto è oltre la soglia dalla polyline."""
     p = (user_lat, user_lon)
-
     for i in range(len(polyline)-1):
         a = polyline[i]
         b = polyline[i+1]
@@ -588,6 +439,11 @@ def fuori_rotta(user_lat, user_lon, polyline, soglia=30):
         if d <= soglia:
             return False
     return True
+
+
+###############################################################
+# AVVIO SERVER
+###############################################################
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

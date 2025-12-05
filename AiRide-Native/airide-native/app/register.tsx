@@ -1,16 +1,23 @@
 import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
 import { Link, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth, db } from "../services/firebaseConfig";
-import { doc, setDoc } from "firebase/firestore";
+import auth from "@react-native-firebase/auth";
+import firestore from "@react-native-firebase/firestore";
+import { useGoogleAuth } from "../services/googleAuth";
 
 export default function RegisterScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const { loginWithGoogle } = useGoogleAuth();
 
   const handleRegister = async () => {
     if (password !== confirm) {
@@ -19,15 +26,16 @@ export default function RegisterScreen() {
     }
 
     try {
-      // 1️⃣ CREA L'UTENTE IN AUTH
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await auth().createUserWithEmailAndPassword(
+        email,
+        password
+      );
       const uid = userCredential.user.uid;
 
-      // 2️⃣ CREA IL DOCUMENTO IN FIRESTORE
-      await setDoc(doc(db, "users", uid), {
+      await firestore().collection("users").doc(uid).set({
         email,
         username: email.split("@")[0],
-        createdAt: new Date(),
+        createdAt: firestore.FieldValue.serverTimestamp(),
 
         settings: {
           hudBrightness: 100,
@@ -50,12 +58,11 @@ export default function RegisterScreen() {
           battery: 0,
           lastConnection: null,
           version: "",
-        }
+        },
       });
 
       alert("Registrazione completata!");
-      router.push("/login");
-
+      router.push("./login");
     } catch (error: any) {
       alert(error.message);
     }
@@ -99,13 +106,44 @@ export default function RegisterScreen() {
         <Text style={styles.buttonText}>Registrati</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        onPress={loginWithGoogle}
+        style={{
+          backgroundColor: "white",
+          borderWidth: 1,
+          borderColor: "#ccc",
+          paddingVertical: 14,
+          borderRadius: 16,
+          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "center",
+          marginBottom: 20,
+        }}
+      >
+        <Feather name="chrome" size={20} color="#E85A2A" />
+        <Text
+          style={{
+            marginLeft: 8,
+            fontSize: 16,
+            color: "#E85A2A",
+            fontWeight: "600",
+          }}
+        >
+          Registrati con Google
+        </Text>
+      </TouchableOpacity>
+
       <Text style={styles.bottomText}>
         Hai già un account?
-        <Link href="/login" style={styles.link}> Accedi</Link>
+        <Link href="./login" style={styles.link}>
+          {" "}
+          Accedi
+        </Link>
       </Text>
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

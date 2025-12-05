@@ -1,7 +1,7 @@
+// services/AuthContext.tsx
 import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
-import { auth, db } from "./firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
+import auth from "@react-native-firebase/auth";
+import firestore from "@react-native-firebase/firestore";
 
 type UserData = {
   email: string;
@@ -13,7 +13,7 @@ type UserData = {
 };
 
 type AuthContextType = {
-  user: User | null;
+  user: any | null;
   userData: UserData | null;
   loading: boolean;
   logout: () => Promise<void>;
@@ -27,18 +27,21 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider = ({ children }: any) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = auth().onAuthStateChanged(async (currentUser) => {
       setUser(currentUser);
 
       if (currentUser) {
-        // 🔥 Carica i dati utente da Firestore
-        const ref = doc(db, "users", currentUser.uid);
-        const snap = await getDoc(ref);
+        // 🔥 Carica i dati utente da Firestore (RNFirebase)
+        const snap = await firestore()
+          .collection("users")
+          .doc(currentUser.uid)
+          .get();
+
         if (snap.exists()) {
           setUserData(snap.data() as UserData);
         }
@@ -53,7 +56,7 @@ export const AuthProvider = ({ children }: any) => {
   }, []);
 
   const logout = async () => {
-    await signOut(auth);
+    await auth().signOut();
   };
 
   return (

@@ -7,12 +7,7 @@ import { AuthProvider } from "../services/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { NavigationProvider } from "../navigation/NavigationContext";
 import { HelmetProvider } from "@/contexts/HelmetContext";
-
-export const unstable_settings = {
-  anchor: "(tabs)",
-};
-
-
+import Toast from "react-native-toast-message";
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -20,19 +15,24 @@ export default function RootLayout() {
   return (
     <HelmetProvider>
       <NavigationProvider>
-        <AuthProvider>   {/* 👈 Aggiunto qui */}
+        <AuthProvider>
           <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-            <Stack>
-              <Stack.Screen name="login" options={{ headerShown: false }} />
-              <Stack.Screen name="register" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="modal" options={{ presentation: "modal" }} />
-            </Stack>
-            <StatusBar style="auto" />
+            <>
+              <Stack>
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+                <Stack.Screen name="register" options={{ headerShown: false }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+              </Stack>
+
+              <StatusBar style="auto" />
+
+              {/* 🔥 NECESSARIO: componente che mostra i toast */}
+              <Toast />
+            </>
           </ThemeProvider>
         </AuthProvider>
       </NavigationProvider>
     </HelmetProvider>
   );
 }
-

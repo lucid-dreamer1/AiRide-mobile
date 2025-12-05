@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "415820909922",
+    "project_id": "airide-app",
+    "storage_bucket": "airide-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:415820909922:android:65b9ffdeadee47ebbe303b",
+        "android_client_info": {
+          "package_name": "com.anonymous.airidenative"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "415820909922-79rc86k01qbq1197j4uprggtkfaoco6i.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBkhrkJKklPpUTw4stqlZYNeGH4Ph20-QE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "415820909922-79rc86k01qbq1197j4uprggtkfaoco6i.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
