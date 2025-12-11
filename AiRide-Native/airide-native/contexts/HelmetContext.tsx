@@ -1,4 +1,6 @@
-// contexts/HelmetContext.tsx
+// ------------------------------------------------------------
+// HelmetContext.tsx - Versione con MOCK integrato
+// ------------------------------------------------------------
 import React, {
   createContext,
   useContext,
@@ -11,6 +13,9 @@ import { Platform, PermissionsAndroid } from "react-native";
 import base64 from "react-native-base64";
 
 const manager = new BleManager();
+
+// 🟦 ATTIVA/DISATTIVA MOCK
+const MOCK_BLE = false;
 
 type HelmetContextType = {
   device: Device | null;
@@ -35,9 +40,11 @@ const HelmetContext = createContext<HelmetContextType>({
 export const useHelmet = () => useContext(HelmetContext);
 
 // ------------------------------------------------------------
-// PERMESSI ANDROID
+// PERMESSI ANDROID (solo se MOCK_BLE = false)
 // ------------------------------------------------------------
 async function requestAndroidPermissions() {
+  if (MOCK_BLE) return true;
+
   if (Platform.OS !== "android") return true;
   if (Platform.Version < 23) return true;
 
@@ -70,33 +77,55 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     return () => {
-      manager.destroy();
+      if (!MOCK_BLE) manager.destroy();
     };
   }, []);
 
   // ------------------------------------------------------------
-  // SCAN + CONNECT
+  // SCAN & CONNECT (con mock)
   // ------------------------------------------------------------
   const scanAndConnect = useCallback(async () => {
-    if (connected) {
-      console.log("Già connesso al casco.");
+    // 🟦 MOCK BLE — Simulazione completa
+    if (MOCK_BLE) {
+      console.log("🟦 MOCK: Avvio scansione finta…");
+      setScanning(true);
+      setError(null);
+
+      setTimeout(() => {
+        console.log("🟦 MOCK: Casco finto trovato!");
+
+        const fakeDevice: Device = {
+          id: "MOCK-DEVICE",
+          name: "DSD TECH (MOCK)",
+          isConnected: async () => true,
+          connect: async () => fakeDevice,
+          cancelConnection: async () => {},
+          discoverAllServicesAndCharacteristics: async () => fakeDevice,
+        } as any;
+
+        setDevice(fakeDevice);
+        setConnected(true);
+        setScanning(false);
+        console.log("🟦 MOCK: Casco finto connesso!");
+      }, 1200);
+
       return;
     }
 
+    // 🟥 CODICE REALE (attivo solo se MOCK_BLE = false)
     const ok = await requestAndroidPermissions();
     if (!ok) {
       setError("Permessi Bluetooth non concessi.");
       return;
     }
 
-    console.log("🔍 Avvio scansione BLE...");
+    console.log("🔍 Avvio scansione BLE reale…");
     setScanning(true);
     setError(null);
 
     return new Promise<void>((resolve) => {
       manager.startDeviceScan(null, null, async (scanError, found) => {
         if (scanError) {
-          console.log("Scan error:", scanError);
           setError("Errore scansione BLE");
           setScanning(false);
           manager.stopDeviceScan();
@@ -105,29 +134,17 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
 
         if (!found) return;
 
-        const name = found.name ?? ""; // Fix: niente localName
-
-        console.log("Trovato:", name, found.id);
-
-        // Moduli riconosciuti
-        const targetNames = [
-          "DSD TECH",
-          "DSD-TECH",
-          "68:5E:1C:33:FB:EB",
-          "HM-10",
-        ];
+        const name = found.name ?? "";
+        const targetNames = ["DSD TECH", "DSD-TECH", "HM-10", "68:5E:1C:33:FB:EB"];
         const nameMatches = targetNames.some((n) => name.includes(n));
 
-        // Moduli HM-10 / BH-10 senza nome → match sui servizi
         const serviceMatches =
           found.serviceUUIDs?.some((s) =>
-            ["FFE0", "FFE1", "0000ffe0", "0000ffe1"].includes(
-              s.replace(/-/g, "").toLowerCase()
-            )
+            ["ffe0", "ffe1"].includes(s.replace(/-/g, "").toLowerCase())
           ) || false;
 
         if (nameMatches || serviceMatches) {
-          console.log("🎯 Casco identificato:", name || "(senza nome)");
+          console.log("🎯 Dispositivo identificato:", name);
 
           manager.stopDeviceScan();
 
@@ -139,9 +156,8 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
             setConnected(true);
             setError(null);
 
-            console.log("✅ Connesso al casco!");
+            console.log("✅ Connesso al casco reale!");
           } catch (err) {
-            console.log("Errore connessione:", err);
             setError("Errore connessione al casco");
           } finally {
             setScanning(false);
@@ -150,10 +166,8 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
-      // Timeout sicurezza 10s
       setTimeout(() => {
         if (scanning) {
-          console.log("⏳ Timeout scansione");
           manager.stopDeviceScan();
           setScanning(false);
           if (!connected) setError("Casco non trovato");
@@ -164,46 +178,52 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
   }, [connected, scanning]);
 
   // ------------------------------------------------------------
-  // SEND BLE
+  // SEND BLE (mock incluso)
   // ------------------------------------------------------------
   const sendToHelmet = useCallback(
-  async (text: string) => {
-    if (!device || !connected) {
-      console.log("❌ Nessun casco connesso, impossibile inviare:", text);
+    async (text: string) => {
+      if (MOCK_BLE) {
+        console.log("🟦 MOCK SEND:", text);
+        return;
+      }
+
+      if (!device || !connected) {
+        console.log("❌ Nessun casco connesso");
+        return;
+      }
+
+      const SERVICE_UUID = "0000FFE0-0000-1000-8000-00805F9B34FB";
+      const CHARACTERISTIC_UUID = "0000FFE1-0000-1000-8000-00805F9B34FB";
+
+      try {
+        const payload = (text.endsWith("\n") ? text : text + "\n").slice(0, 20);
+        const msg = base64.encode(payload);
+
+        await device.writeCharacteristicWithoutResponseForService(
+          SERVICE_UUID,
+          CHARACTERISTIC_UUID,
+          msg
+        );
+
+        console.log("📤 Inviato al casco:", payload);
+      } catch (err) {
+        setError("Errore invio dati");
+      }
+    },
+    [device, connected]
+  );
+
+  // ------------------------------------------------------------
+  // DISCONNECT (mock incluso)
+  // ------------------------------------------------------------
+  const disconnect = useCallback(async () => {
+    if (MOCK_BLE) {
+      console.log("🟦 MOCK: Disconnessione casco finto");
+      setDevice(null);
+      setConnected(false);
       return;
     }
 
-    const SERVICE_UUID = "0000FFE0-0000-1000-8000-00805F9B34FB";
-    const CHARACTERISTIC_UUID = "0000FFE1-0000-1000-8000-00805F9B34FB";
-
-    try {
-      // 🔥 AGGIUNGE IL NEWLINE AUTOMATICAMENTE
-      const payload = text.endsWith("\n") ? text : text + "\n";
-
-      // 🔥 LIMITE HM-10: max 20 bytes → tronca tutto il resto
-      const safePayload = payload.slice(0, 20);
-
-      const msg = base64.encode(safePayload);
-
-      await device.writeCharacteristicWithoutResponseForService(
-        SERVICE_UUID,
-        CHARACTERISTIC_UUID,
-        msg
-      );
-
-      console.log("📤 Inviato al casco:", safePayload);
-    } catch (err) {
-      console.log("Errore invio BLE:", err);
-      setError("Errore invio dati");
-    }
-  },
-  [device, connected]
-);
-
-  // ------------------------------------------------------------
-  // DISCONNECT
-  // ------------------------------------------------------------
-  const disconnect = useCallback(async () => {
     try {
       if (device) await device.cancelConnection();
     } catch (e) {
@@ -214,9 +234,6 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
     }
   }, [device]);
 
-  // ------------------------------------------------------------
-  // RENDER
-  // ------------------------------------------------------------
   return (
     <HelmetContext.Provider
       value={{

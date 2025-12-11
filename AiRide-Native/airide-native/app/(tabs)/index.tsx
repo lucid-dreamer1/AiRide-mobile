@@ -1,4 +1,6 @@
-// HomeScreen.tsx — Fullscreen + DemoPanel + Ripercorri Fixato
+// -------------------------------------------------------------
+// AiRide - HomeScreen (index.tsx) — VERSIONE COMPLETA + FIX BLE
+// -------------------------------------------------------------
 
 import React, { useEffect, useState, useRef } from "react";
 import {
@@ -10,6 +12,7 @@ import {
   ActivityIndicator,
   Animated,
 } from "react-native";
+import { useTheme } from "@/contexts/ThemeContext";
 
 import { saveRide } from "@/services/saveRide";
 import Toast from "react-native-toast-message";
@@ -21,7 +24,11 @@ import { Feather } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useLocalSearchParams } from "expo-router";
 
-import { getRoute, updatePosition, openInstructionStream } from "@/services/api";
+import {
+  getRoute,
+  updatePosition,
+  openInstructionStream,
+} from "@/services/api";
 import { useNavigationContext } from "@/navigation/NavigationContext";
 import { useHelmet } from "@/contexts/HelmetContext";
 import useNavigationUpdater from "@/hooks/useNavigationUpdater";
@@ -36,6 +43,9 @@ const interpolate = (p1: Point, p2: Point, t: number): Point => ({
 });
 
 export default function HomeScreen() {
+  const { themeColors } = useTheme();
+  const styles = createStyles(themeColors);
+
   const {
     routeCoords,
     setRouteCoords,
@@ -47,7 +57,9 @@ export default function HomeScreen() {
     setCurrentInstruction,
   } = useNavigationContext();
 
-  const { connected, error } = useHelmet();
+  // 👇 FIX: usiamo scanAndConnect (quello del tuo HelmetContext)
+  const { connected, error, scanAndConnect } = useHelmet();
+
   const { user } = useAuth();
   const params = useLocalSearchParams();
 
@@ -61,7 +73,6 @@ export default function HomeScreen() {
   const mapRef = useRef<MapView | null>(null);
   const streamRef = useRef<any>(null);
 
-  // ⭐ FIX: evita doppio/triplo fetchRoute quando arrivi da RIPERCORRI
   const hasLoadedFromRides = useRef(false);
 
   const demoIndexRef = useRef(0);
@@ -70,17 +81,16 @@ export default function HomeScreen() {
   const lastGPSUpdate = useRef(0);
 
   // -------------------------------------------------------------
-  // ⭐ RIPERCORRI: auto-carica destinazione in modo sicuro
+  // AUTO RI-PERCORRI
   // -------------------------------------------------------------
   useEffect(() => {
     if (!params?.destination) return;
+    if (hasLoadedFromRides.current) return;
 
-    if (hasLoadedFromRides.current) return; // 🔥 BLOCCA richiami multipli
     hasLoadedFromRides.current = true;
-
     const dest = String(params.destination);
-    setDestination(dest);
 
+    setDestination(dest);
     fetchRoute(dest);
   }, [params]);
 
@@ -100,8 +110,11 @@ export default function HomeScreen() {
         };
 
         setCurrentPosition(p);
-        mapRef.current?.animateCamera({ center: p, zoom: 16 }, { duration: 500 });
-      } catch (e) {}
+        mapRef.current?.animateCamera(
+          { center: p, zoom: 16 },
+          { duration: 500 }
+        );
+      } catch {}
     })();
   }, []);
 
@@ -113,8 +126,8 @@ export default function HomeScreen() {
       setLoadingRoute(true);
 
       const dest = overrideDest ?? destination;
-
       const pos = await Location.getCurrentPositionAsync({});
+
       const start = {
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,
@@ -186,7 +199,10 @@ export default function HomeScreen() {
 
       if (now - lastCameraUpdate.current > 350) {
         lastCameraUpdate.current = now;
-        mapRef.current?.animateCamera({ center: pos, zoom: 16 }, { duration: 180 });
+        mapRef.current?.animateCamera(
+          { center: pos, zoom: 16 },
+          { duration: 180 }
+        );
       }
 
       demoIndexRef.current = newIndex;
@@ -197,11 +213,20 @@ export default function HomeScreen() {
   }, [routeCoords, demoSpeed, demoCanStart]);
 
   // -------------------------------------------------------------
-  // INVIA AL CASCO + SALVA TRATTA
+  // INVIO TRATTA (BLOCCATO SENZA CONNESSIONE AL CASCO)
   // -------------------------------------------------------------
   const handleSend = async () => {
     if (!destination.trim()) return;
     if (!currentPosition) return;
+
+    if (!connected) {
+      Toast.show({
+        type: "error",
+        text1: "Casco non connesso",
+        text2: "Connetti il casco prima di inviare il percorso.",
+      });
+      return;
+    }
 
     if (!routeCoords || routeCoords.length < 2) {
       Toast.show({ type: "error", text1: "Calcola prima il percorso" });
@@ -248,7 +273,6 @@ export default function HomeScreen() {
         }
       );
     } catch (err) {
-      console.log("Errore salvataggio tratta:", err);
       Toast.show({
         type: "error",
         text1: "Errore",
@@ -259,13 +283,15 @@ export default function HomeScreen() {
 
   useNavigationUpdater(currentInstruction, setCurrentInstruction);
 
-  // DEMO PANEL
+  // -------------------------------------------------------------
+  // PANEL ANIMATION
+  // -------------------------------------------------------------
   const panelAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(panelAnim, {
       toValue: showDemoPanel ? 1 : 0,
       duration: 180,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   }, [showDemoPanel]);
 
@@ -274,16 +300,19 @@ export default function HomeScreen() {
     outputRange: [-20, 0],
   });
 
+  // -------------------------------------------------------------
+  // UI
+  // -------------------------------------------------------------
   return (
     <View style={styles.container}>
-      {/* MAPPA FULLSCREEN */}
+      {/* MAPPA */}
       <MapView
         ref={mapRef}
         style={styles.map}
         showsUserLocation={false}
         initialRegion={{
-          latitude: currentPosition?.latitude || 0,
-          longitude: currentPosition?.longitude || 0,
+          latitude: currentPosition?.latitude ?? 0,
+          longitude: currentPosition?.longitude ?? 0,
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         }}
@@ -297,17 +326,21 @@ export default function HomeScreen() {
         )}
 
         {routeCoords.length > 0 && (
-          <Polyline coordinates={routeCoords} strokeWidth={6} strokeColor="#E85A2A" />
+          <Polyline
+            coordinates={routeCoords}
+            strokeWidth={6}
+            strokeColor="#E85A2A"
+          />
         )}
       </MapView>
 
       {/* SEARCH BAR */}
       <View style={styles.searchCard}>
-        <Feather name="search" size={20} color="#E85A2A" />
+        <Feather name="search" size={20} color={themeColors.accent} />
 
         <TextInput
           placeholder="Dove vuoi andare?"
-          placeholderTextColor="#777"
+          placeholderTextColor={themeColors.textMuted}
           style={styles.input}
           value={destination}
           onChangeText={setDestination}
@@ -315,10 +348,14 @@ export default function HomeScreen() {
         />
 
         {loadingRoute ? (
-          <ActivityIndicator size="small" color="#E85A2A" />
+          <ActivityIndicator size="small" color={themeColors.accent} />
         ) : (
           <TouchableOpacity onPress={() => fetchRoute()}>
-            <Feather name="arrow-right-circle" size={26} color="#E85A2A" />
+            <Feather
+              name="arrow-right-circle"
+              size={26}
+              color={themeColors.accent}
+            />
           </TouchableOpacity>
         )}
       </View>
@@ -336,7 +373,10 @@ export default function HomeScreen() {
           <Animated.View
             style={[
               styles.demoPanel,
-              { opacity: panelAnim, transform: [{ translateY: panelTranslate }] },
+              {
+                opacity: panelAnim,
+                transform: [{ translateY: panelTranslate }],
+              },
             ]}
           >
             <Text style={styles.demoLabel}>Velocità demo</Text>
@@ -366,16 +406,28 @@ export default function HomeScreen() {
               })}
             </View>
 
+            {/* ESTENSIONE: STATO BLE */}
             <View style={styles.bleStatus}>
               <Feather
                 name={connected ? "check-circle" : "bluetooth"}
                 size={16}
-                color={connected ? "#1DB954" : "#E85A2A"}
+                color={connected ? "#1DB954" : themeColors.accent}
               />
               <Text style={styles.bleStatusText}>
                 {connected ? "Casco connesso" : "Casco non connesso"}
               </Text>
             </View>
+
+            {/* 🔵 BOTTONE DI CONNESSIONE MANUALE */}
+            {!connected && (
+              <TouchableOpacity
+                onPress={scanAndConnect}
+                style={styles.connectButton}
+              >
+                <Feather name="link" size={16} color="white" />
+                <Text style={styles.connectButtonText}>Connetti casco</Text>
+              </TouchableOpacity>
+            )}
 
             {error && (
               <Text style={{ fontSize: 11, color: "#C62828", marginTop: 6 }}>
@@ -387,7 +439,9 @@ export default function HomeScreen() {
       )}
 
       {/* INSTRUCTION CARD */}
-      {showInstructionCard && <InstructionCard instruction={currentInstruction} />}
+      {showInstructionCard && (
+        <InstructionCard instruction={currentInstruction} />
+      )}
 
       {/* SEND BUTTON */}
       <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
@@ -402,125 +456,177 @@ export default function HomeScreen() {
 // STILI
 ////////////////////////////////////////////////////////////
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  map: { ...StyleSheet.absoluteFillObject },
+const createStyles = (colors: any) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.bg,
+    },
 
-  searchCard: {
-    position: "absolute",
-    top: 50,
-    left: 16,
-    right: 16,
-    padding: 14,
-    backgroundColor: "white",
-    borderRadius: 28,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    elevation: 6,
-  },
+    map: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+    },
 
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: "#222",
-  },
+    searchCard: {
+      position: "absolute",
+      top: 50,
+      left: 16,
+      right: 16,
+      padding: 14,
+      backgroundColor: colors.card,
+      borderRadius: 28,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      elevation: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
 
-  gpsMarkerOuter: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(232,90,42,0.20)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  gpsMarkerInner: {
-    width: 15,
-    height: 15,
-    borderRadius: 8,
-    backgroundColor: "#E85A2A",
-    borderWidth: 3,
-    borderColor: "white",
-  },
+    input: {
+      flex: 1,
+      fontSize: 16,
+      color: colors.text,
+    },
 
-  demoFab: {
-    position: "absolute",
-    top: 135,
-    right: 20,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#E85A2A",
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 8,
-  },
+    gpsMarkerOuter: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.accent + "33",
+      justifyContent: "center",
+      alignItems: "center",
+    },
 
-  demoPanel: {
-    position: "absolute",
-    top: 200,
-    right: 20,
-    width: 170,
-    backgroundColor: "white",
-    padding: 14,
-    borderRadius: 20,
-    elevation: 10,
-  },
-  demoLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 10,
-    color: "#222",
-  },
-  demoButtons: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  demoButton: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    alignItems: "center",
-  },
-  demoButtonActive: {
-    backgroundColor: "#E85A2A",
-    borderColor: "#E85A2A",
-  },
-  demoButtonText: { fontSize: 12, color: "#444" },
-  demoButtonTextActive: { color: "white" },
+    gpsMarkerInner: {
+      width: 15,
+      height: 15,
+      borderRadius: 8,
+      backgroundColor: colors.accent,
+      borderWidth: 3,
+      borderColor: colors.card,
+    },
 
-  bleStatus: {
-    marginTop: 14,
-    backgroundColor: "#FFFFFFEE",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    elevation: 3,
-  },
-  bleStatusText: { fontSize: 12, color: "#333" },
+    demoFab: {
+      position: "absolute",
+      top: 135,
+      right: 20,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: colors.accent,
+      justifyContent: "center",
+      alignItems: "center",
+      elevation: 8,
+    },
 
-  sendButton: {
-    position: "absolute",
-    bottom: 60,
-    left: 16,
-    right: 16,
-    height: 58,
-    borderRadius: 28,
-    backgroundColor: "#E85A2A",
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-    elevation: 12,
-  },
-  sendButtonText: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "white",
-  },
-});
+    demoPanel: {
+      position: "absolute",
+      top: 200,
+      right: 20,
+      width: 170,
+      backgroundColor: colors.card,
+      padding: 14,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      elevation: 10,
+    },
+
+    demoLabel: {
+      fontSize: 14,
+      fontWeight: "600",
+      marginBottom: 10,
+      color: colors.text,
+    },
+
+    demoButtons: {
+      flexDirection: "row",
+      gap: 6,
+    },
+
+    demoButton: {
+      flex: 1,
+      paddingVertical: 8,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: "center",
+    },
+
+    demoButtonActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+
+    demoButtonText: {
+      fontSize: 12,
+      color: colors.textMuted,
+    },
+
+    demoButtonTextActive: {
+      color: "white",
+    },
+
+    bleStatus: {
+      marginTop: 14,
+      backgroundColor: colors.card + "EE",
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 14,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+      elevation: 3,
+    },
+
+    bleStatusText: {
+      fontSize: 12,
+      color: colors.text,
+    },
+
+    connectButton: {
+      marginTop: 10,
+      backgroundColor: colors.accent,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      justifyContent: "center",
+    },
+
+    connectButtonText: {
+      color: "white",
+      fontSize: 13,
+      fontWeight: "600",
+    },
+
+    sendButton: {
+      position: "absolute",
+      bottom: 60,
+      left: 16,
+      right: 16,
+      height: 58,
+      borderRadius: 28,
+      backgroundColor: colors.accent,
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 10,
+      elevation: 12,
+    },
+
+    sendButtonText: {
+      fontSize: 17,
+      fontWeight: "600",
+      color: "white",
+    },
+  });

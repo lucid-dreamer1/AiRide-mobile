@@ -1,19 +1,21 @@
-// AiRide-Native/airide-native/app/(tabs)/_layout.tsx
+// app/(tabs)/_layout.tsx
 import { Tabs } from "expo-router";
 import React from "react";
-import { Alert, TouchableOpacity, Text } from "react-native";
+import { Alert } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { HelmetProvider } from "@/contexts/HelmetContext";
 
 import auth from "@react-native-firebase/auth";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  // ⛔ NON usare { colors }
+  // ✅ Usa themeColors
+  const { themeColors } = useTheme();
 
   const confirmLogout = () => {
     Alert.alert(
@@ -38,46 +40,70 @@ export default function TabLayout() {
   };
 
   return (
-    <HelmetProvider>
-      <Tabs
-        screenOptions={{
-          tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
-          headerShown: false,
-          tabBarButton: HapticTab,
-        }}
-      >
-        {/* HOME */}
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: "Home",
-            tabBarIcon: ({ color }) => (
-              <IconSymbol size={28} name="house.fill" color={color} />
-            ),
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <HelmetProvider>
+        <Tabs
+          screenOptions={{
+            headerShown: false,
+            tabBarActiveTintColor: themeColors.accent,
+            tabBarStyle: {
+              backgroundColor: themeColors.card,
+              borderTopColor: themeColors.border,
+            },
+            tabBarButton: HapticTab,
           }}
-        />
-        {/* RIDES */}
-        <Tabs.Screen
-          name="rides"
-          options={{
-            title: "Rides",
-            tabBarIcon: ({ color }) => (
-              <Feather name="map" size={26} color={color} />
-            ),
-          }}
-        />
+        >
+          <Tabs.Screen
+            name="index"
+            options={{
+              title: "Home",
+              tabBarIcon: ({ color }) => (
+                <IconSymbol size={28} name="house.fill" color={color} />
+              ),
+            }}
+          />
 
-        {/* SLOT VUOTO CHE OCCUPA UNA POSIZIONE NELLA TAB BAR */}
-        <Tabs.Screen
-          name="logout"
-          options={{
-            tabBarLabel: "Logout",
-            tabBarIcon: ({ color }) => (
-              <Feather name="log-out" size={26} color={color} />
-            ),
-          }}
-        />
-      </Tabs>
-    </HelmetProvider>
+          <Tabs.Screen
+            name="rides"
+            options={{
+              title: "Rides",
+              tabBarIcon: ({ color }) => (
+                <Feather name="map" size={26} color={color} />
+              ),
+            }}
+          />
+
+          <Tabs.Screen
+            name="trophy"
+            options={{
+              title: "Trophy",
+              tabBarIcon: ({ color }) => (
+                <Feather name="award" size={26} color={color} />
+              ),
+            }}
+          />
+
+          <Tabs.Screen
+            name="settings"
+            options={{
+              title: "Settings",
+              tabBarIcon: ({ color }) => (
+                <Feather name="settings" size={26} color={color} />
+              ),
+            }}
+          />
+
+          <Tabs.Screen
+            name="logout"
+            options={{
+              tabBarLabel: "Logout",
+              tabBarIcon: ({ color }) => (
+                <Feather name="log-out" size={26} color={color} />
+              ),
+            }}
+          />
+        </Tabs>
+      </HelmetProvider>
+    </GestureHandlerRootView>
   );
 }
