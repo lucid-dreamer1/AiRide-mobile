@@ -69,9 +69,11 @@ export default function HomeScreen() {
   const [demoCanStart, setDemoCanStart] = useState(false);
   const [demoSpeed, setDemoSpeed] = useState(3);
   const [showDemoPanel, setShowDemoPanel] = useState(false);
+  const [showBlePanel, setShowBlePanel] = useState(false);
+
+  const [isNavigating, setIsNavigating] = useState(false); // <--- NUOVO STATO
 
   const mapRef = useRef<MapView | null>(null);
-
 
   const hasLoadedFromRides = useRef(false);
 
@@ -124,6 +126,7 @@ export default function HomeScreen() {
   const fetchRoute = async (overrideDest?: string) => {
     try {
       setLoadingRoute(true);
+      setIsNavigating(false); // Reset navigazione se ricalcolo
 
       const dest = overrideDest ?? destination;
       const pos = await Location.getCurrentPositionAsync({});
@@ -162,6 +165,66 @@ export default function HomeScreen() {
       setLoadingRoute(false);
     }
   };
+
+  // -------------------------------------------------------------
+  // REAL GPS NAVIGATION LOOP (QUANDO NON IN DEMO_MODE)
+  // -------------------------------------------------------------
+  useEffect(() => {
+    // Attiva solo se stiamo navigando e NON siamo in demo mode
+    if (!isNavigating || DEMO_MODE) return;
+
+    let subscriber: Location.LocationSubscription | null = null;
+
+    const startWatching = async () => {
+      try {
+        subscriber = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.BestForNavigation,
+            timeInterval: 1000, // Aggiorna ogni secondo
+            distanceInterval: 5, // O ogni 5 metri
+          },
+          async (loc) => {
+            const { latitude, longitude } = loc.coords;
+            const newPos = { latitude, longitude };
+            
+            // 1. Aggiorna posizione locale
+            setCurrentPosition(newPos);
+
+            const now = Date.now();
+
+            // 2. Aggiorna Camera (throttle ~350ms)
+            if (now - lastCameraUpdate.current > 350) {
+              lastCameraUpdate.current = now;
+              mapRef.current?.animateCamera(
+                { center: newPos, zoom: 18, heading: loc.coords.heading ?? 0 },
+                { duration: 500 }
+              );
+            }
+
+            // 3. Invia al server (throttle ~2s per non intasare)
+            if (now - lastGPSUpdate.current > 2000) {
+              lastGPSUpdate.current = now;
+              
+              // Chiama il backend per aggiornare l'istruzione
+              const res = await updatePosition(latitude, longitude);
+              if (res?.nav) {
+                setCurrentInstruction(res.nav);
+              }
+            }
+          }
+        );
+      } catch (err) {
+        console.log("Errore watchPosition:", err);
+      }
+    };
+
+    startWatching();
+
+    return () => {
+      if (subscriber) subscriber.remove();
+    };
+  }, [isNavigating]); 
+
 
   // -------------------------------------------------------------
   // DEMO MOVEMENT
@@ -238,7 +301,10 @@ export default function HomeScreen() {
       return;
     }
 
-    setDemoCanStart(true);
+    // Se DEMO_MODE è true, avvia la simulazione
+    if (DEMO_MODE) {
+       setDemoCanStart(true);
+    } 
 
     try {
       await saveRide({
@@ -267,8 +333,11 @@ export default function HomeScreen() {
         destination
       );
 
-      // NON ESEGUO STREAMING SSE — Il polling in DEMO_MODE (o GPS reale) aggiornerà l'istruzione
-      // tramite la risposta di updatePosition()
+      // 🔥 AVVIA LA NAVIGATION LOOP REALE
+      if (!DEMO_MODE) {
+        setIsNavigating(true);
+      }
+
     } catch (err) {
       Toast.show({
         type: "error",
@@ -293,6 +362,23 @@ export default function HomeScreen() {
   }, [showDemoPanel]);
 
   const panelTranslate = panelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-20, 0],
+  });
+
+  // -------------------------------------------------------------
+  // BLE PANEL ANIMATION
+  // -------------------------------------------------------------
+  const blePanelAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(blePanelAnim, {
+      toValue: showBlePanel ? 1 : 0,
+      duration: 180,
+      useNativeDriver: false,
+    }).start();
+  }, [showBlePanel]);
+
+  const blePanelTranslate = blePanelAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [-20, 0],
   });
@@ -357,7 +443,56 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* DEMO PANEL */}
+
+      {/* 🔹 BLE FAB (SEMPRE VISIBILE) */}
+      <TouchableOpacity
+        onPress={() => setShowBlePanel(!showBlePanel)}
+        style={[styles.bleFab, { backgroundColor: connected ? "#1DB954" : themeColors.card, borderWidth: 2, borderColor: connected ? "#1DB954" : themeColors.accent }]}
+      >
+        <Feather name="bluetooth" size={22} color={connected ? "white" : themeColors.accent} />
+      </TouchableOpacity>
+
+      {/* 🔹 BLE PANEL */}
+      <Animated.View
+        style={[
+          styles.blePanel,
+          {
+            opacity: blePanelAnim,
+            transform: [{ translateY: blePanelTranslate }],
+          },
+        ]}
+      >
+        <Text style={styles.demoLabel}>Stato Casco</Text>
+        
+        <View style={styles.bleStatus}>
+          <Feather
+            name={connected ? "check-circle" : "bluetooth"}
+            size={16}
+            color={connected ? "#1DB954" : themeColors.accent}
+          />
+          <Text style={styles.bleStatusText}>
+            {connected ? "Connesso" : "Non connesso"}
+          </Text>
+        </View>
+
+        {!connected && (
+          <TouchableOpacity
+            onPress={scanAndConnect}
+            style={styles.connectButton}
+          >
+            <Feather name="link" size={16} color="white" />
+            <Text style={styles.connectButtonText}>Connetti</Text>
+          </TouchableOpacity>
+        )}
+
+        {error && (
+          <Text style={{ fontSize: 11, color: "#C62828", marginTop: 6 }}>
+            {error}
+          </Text>
+        )}
+      </Animated.View>
+
+      {/* DEMO PANEL (SOLO SE DEMO_MODE) */}
       {DEMO_MODE && (
         <>
           <TouchableOpacity
@@ -366,19 +501,19 @@ export default function HomeScreen() {
           >
             <Feather name="settings" size={22} color="white" />
           </TouchableOpacity>
-
+          { /* ... resto del pannello demo omesso per brevità se non richiesto, ma mantengo logica esistente se serve ... */ }
           <Animated.View
             style={[
               styles.demoPanel,
               {
+                // top: 270, (removed inline override)
                 opacity: panelAnim,
                 transform: [{ translateY: panelTranslate }],
               },
             ]}
           >
             <Text style={styles.demoLabel}>Velocità demo</Text>
-
-            <View style={styles.demoButtons}>
+             <View style={styles.demoButtons}>
               {["0.5", "1", "3", "5"].map((v) => {
                 const s = Number(v);
                 return (
@@ -402,35 +537,6 @@ export default function HomeScreen() {
                 );
               })}
             </View>
-
-            {/* ESTENSIONE: STATO BLE */}
-            <View style={styles.bleStatus}>
-              <Feather
-                name={connected ? "check-circle" : "bluetooth"}
-                size={16}
-                color={connected ? "#1DB954" : themeColors.accent}
-              />
-              <Text style={styles.bleStatusText}>
-                {connected ? "Casco connesso" : "Casco non connesso"}
-              </Text>
-            </View>
-
-            {/* 🔵 BOTTONE DI CONNESSIONE MANUALE */}
-            {!connected && (
-              <TouchableOpacity
-                onPress={scanAndConnect}
-                style={styles.connectButton}
-              >
-                <Feather name="link" size={16} color="white" />
-                <Text style={styles.connectButtonText}>Connetti casco</Text>
-              </TouchableOpacity>
-            )}
-
-            {error && (
-              <Text style={{ fontSize: 11, color: "#C62828", marginTop: 6 }}>
-                {error}
-              </Text>
-            )}
           </Animated.View>
         </>
       )}
@@ -511,7 +617,7 @@ const createStyles = (colors: any) =>
     demoFab: {
       position: "absolute",
       top: 135,
-      right: 20,
+      left: 20,
       width: 52,
       height: 52,
       borderRadius: 26,
@@ -522,6 +628,32 @@ const createStyles = (colors: any) =>
     },
 
     demoPanel: {
+      position: "absolute",
+      top: 200,
+      left: 20,
+      width: 170,
+      backgroundColor: colors.card,
+      padding: 14,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      elevation: 10,
+    },
+
+    bleFab: {
+      position: "absolute",
+      top: 135,
+      right: 20,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: colors.accent,
+      justifyContent: "center",
+      alignItems: "center",
+      elevation: 8,
+    },
+
+    blePanel: {
       position: "absolute",
       top: 200,
       right: 20,

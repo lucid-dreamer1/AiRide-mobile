@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useHelmet } from "@/contexts/HelmetContext";
 
+
 export interface NavInstruction {
   testo?: string;
   text?: string;
@@ -32,8 +33,7 @@ export default function useNavigationUpdater(
       if (now - lastSent.current >= 250) {
         lastSent.current = now;
 
-        const shortText = (instruction.testo || instruction.text || "").slice(0, 10);
-        const packet = `${instruction.freccia}|${dist}|${shortText}`;
+        const packet = `${instruction.freccia}|${dist}`;
 
         sendToHelmet(packet).catch(() => {});
       }

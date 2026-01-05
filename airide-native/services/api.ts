@@ -1,6 +1,6 @@
 import EventSource from "react-native-sse";
 
-const BASE_URL = "https://unmouldering-eliana-unreclaimed.ngrok-free.dev";
+const BASE_URL = "https://airide-backend.onrender.com";
 
 // ======================================================
 // 📌 PRENDI IL PERCORSO

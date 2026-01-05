@@ -37,7 +37,11 @@ function NavigationThemeWrapper({ children }: { children: React.ReactNode }) {
   return <NavThemeProvider value={navigationTheme}>{children}</NavThemeProvider>;
 }
 
+import { useKeepAwake } from "expo-keep-awake";
+
 export default function RootLayout() {
+  useKeepAwake();
+
   return (
     <HelmetProvider>
       <NavigationProvider>

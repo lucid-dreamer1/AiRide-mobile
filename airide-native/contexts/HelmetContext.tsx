@@ -15,7 +15,7 @@ import base64 from "react-native-base64";
 const manager = new BleManager();
 
 // 🟦 ATTIVA/DISATTIVA MOCK
-const MOCK_BLE = true;
+const MOCK_BLE = false;
 
 type HelmetContextType = {
   device: Device | null;
@@ -119,6 +119,17 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    try {
+      const state = await manager.state();
+      if (state !== "PoweredOn") {
+        setError(`Bluetooth non attivo (Stato: ${state}). Attivalo e riprova.`);
+        return;
+      }
+    } catch (e) {
+      console.log("Errore controllo stato BLE:", e);
+      // Proceed anyway or handle error? proceeding might fail scan, but let's try
+    }
+
     console.log("🔍 Avvio scansione BLE reale…");
     setScanning(true);
     setError(null);
@@ -126,7 +137,8 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
     return new Promise<void>((resolve) => {
       manager.startDeviceScan(null, null, async (scanError, found) => {
         if (scanError) {
-          setError("Errore scansione BLE");
+          console.error("BLE Scan Error:", scanError);
+          setError(`Errore scansione BLE: ${scanError.message} (Code: ${scanError.errorCode})`);
           setScanning(false);
           manager.stopDeviceScan();
           return resolve();
