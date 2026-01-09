@@ -208,7 +208,16 @@ export default function HomeScreen() {
               // Chiama il backend per aggiornare l'istruzione
               const res = await updatePosition(latitude, longitude);
               if (res?.nav) {
-                setCurrentInstruction(res.nav);
+                // Iniettiamo i metadati delle distanze se non presenti
+                const totalMeters = (Number(String(routeInfo?.distance).replace(" km", "")) || 0) * 1000;
+                // Assumiamo che se il backend dà remaining_dist, sia in km (se non specificato diversamente)
+                const remainingMeters = res.nav.remaining_dist ? res.nav.remaining_dist * 1000 : totalMeters;
+
+                setCurrentInstruction({
+                  ...res.nav,
+                  total_dist: totalMeters,
+                  remaining_dist: remainingMeters
+                });
               }
             }
           }
@@ -260,7 +269,16 @@ export default function HomeScreen() {
         lastGPSUpdate.current = now;
         updatePosition(pos.latitude, pos.longitude).then((res) => {
           if (res?.nav) {
-            setCurrentInstruction(res.nav);
+            const totalMeters = (Number(String(routeInfo?.distance).replace(" km", "")) || 0) * 1000;
+            const remainingMeters = res.nav.remaining_dist 
+              ? res.nav.remaining_dist * 1000 
+              : (totalMeters * (1 - newIndex / routeCoords.length)); // Simulazione metri per demo
+
+            setCurrentInstruction({
+              ...res.nav,
+              total_dist: totalMeters,
+              remaining_dist: remainingMeters
+            });
           }
         });
       }
@@ -345,6 +363,26 @@ export default function HomeScreen() {
         text2: "Impossibile salvare la tratta",
       });
     }
+  };
+
+  const handleResetRoute = () => {
+    setIsNavigating(false);
+    setDemoCanStart(false);
+    setRouteCoords([]);
+    setCurrentInstruction(null);
+    setRouteInfo({ duration: "", distance: "" });
+    setDestination("");
+    setShowInstructionCard(false);
+    
+    // Reset demo refs
+    demoIndexRef.current = 0;
+    demoTRef.current = 0;
+
+    Toast.show({
+      type: "info",
+      text1: "Rotta resettata",
+      text2: "Mappa pulita con successo",
+    });
   };
 
   useNavigationUpdater(currentInstruction, setCurrentInstruction);
@@ -491,6 +529,16 @@ export default function HomeScreen() {
           </Text>
         )}
       </Animated.View>
+
+      {/* 🔹 RESET ROUTE FAB (Visibile solo se c'è una rotta) */}
+      {(routeCoords.length > 0 || isNavigating) && (
+        <TouchableOpacity
+          onPress={handleResetRoute}
+          style={styles.resetFab}
+        >
+          <Feather name="trash-2" size={22} color="white" />
+        </TouchableOpacity>
+      )}
 
       {/* DEMO PANEL (SOLO SE DEMO_MODE) */}
       {DEMO_MODE && (
@@ -664,6 +712,19 @@ const createStyles = (colors: any) =>
       borderWidth: 1,
       borderColor: colors.border,
       elevation: 10,
+    },
+
+    resetFab: {
+      position: "absolute",
+      top: 135,
+      right: 85, // A sinistra del Bluetooth FAB
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: "#C62828", // Rosso scuro
+      justifyContent: "center",
+      alignItems: "center",
+      elevation: 8,
     },
 
     demoLabel: {

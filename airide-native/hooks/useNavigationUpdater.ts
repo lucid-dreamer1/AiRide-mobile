@@ -7,6 +7,8 @@ export interface NavInstruction {
   text?: string;
   freccia?: number;
   metri?: number;
+  remaining_dist?: number; // metri rimanenti
+  total_dist?: number;     // metri totali del percorso
   next?: NavInstruction;
 }
 
@@ -33,7 +35,12 @@ export default function useNavigationUpdater(
       if (now - lastSent.current >= 250) {
         lastSent.current = now;
 
-        const packet = `${instruction.freccia}|${dist}`;
+        const rem = instruction.remaining_dist ?? 0;
+        const tot = instruction.total_dist ?? 0;
+
+        // Formato: freccia|metri_svolta|metri_rimanenti|metri_totali
+        // Usiamo Math.round per avere interi puliti
+        const packet = `${instruction.freccia}|${dist}|${Math.round(rem)}|${Math.round(tot)}`;
 
         sendToHelmet(packet).catch(() => {});
       }
