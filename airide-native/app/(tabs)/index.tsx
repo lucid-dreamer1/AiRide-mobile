@@ -32,6 +32,8 @@ import {
 import { useNavigationContext } from "@/navigation/NavigationContext";
 import { useHelmet } from "@/contexts/HelmetContext";
 import useNavigationUpdater from "@/hooks/useNavigationUpdater";
+import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
+import { useVoiceSettings } from "@/contexts/VoiceSettingsContext";
 
 const DEMO_MODE = true;
 
@@ -59,6 +61,9 @@ export default function HomeScreen() {
 
   // 👇 FIX: usiamo scanAndConnect (quello del tuo HelmetContext)
   const { connected, error, scanAndConnect } = useHelmet();
+
+  // Voice Assistant
+  const { settings: voiceSettings } = useVoiceSettings();
 
   const { user } = useAuth();
   const params = useLocalSearchParams();
@@ -386,6 +391,13 @@ export default function HomeScreen() {
   };
 
   useNavigationUpdater(currentInstruction, setCurrentInstruction);
+
+  // Voice Assistant - sincronizzato con le istruzioni di navigazione
+  useVoiceAssistant({
+    instruction: currentInstruction,
+    enabled: voiceSettings.enabled && (isNavigating || demoCanStart),
+    settings: voiceSettings,
+  });
 
   // -------------------------------------------------------------
   // PANEL ANIMATION

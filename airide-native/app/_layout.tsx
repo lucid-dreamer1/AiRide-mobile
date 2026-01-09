@@ -12,6 +12,7 @@ import "react-native-reanimated";
 import { AuthProvider } from "../services/AuthContext";
 import { NavigationProvider } from "../navigation/NavigationContext";
 import { HelmetProvider } from "@/contexts/HelmetContext";
+import { VoiceSettingsProvider } from "@/contexts/VoiceSettingsContext";
 
 import Toast from "react-native-toast-message";
 
@@ -46,24 +47,27 @@ export default function RootLayout() {
     <HelmetProvider>
       <NavigationProvider>
         <AuthProvider>
-          {/* ⭐ 1) Theme globale AiRide */}
-          <ThemeProvider>
-            {/* ⭐ 2) Navigation Theme sincronizzato col tuo tema */}
-            <NavigationThemeWrapper>
-              <>
-                <Stack>
-                  <Stack.Screen name="login" options={{ headerShown: false }} />
-                  <Stack.Screen name="register" options={{ headerShown: false }} />
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                  <Stack.Screen name="modal" options={{ presentation: "modal" }} />
-                </Stack>
+          {/* ⭐ Voice Settings Provider */}
+          <VoiceSettingsProvider>
+            {/* ⭐ 1) Theme globale AiRide */}
+            <ThemeProvider>
+              {/* ⭐ 2) Navigation Theme sincronizzato col tuo tema */}
+              <NavigationThemeWrapper>
+                <>
+                  <Stack>
+                    <Stack.Screen name="login" options={{ headerShown: false }} />
+                    <Stack.Screen name="register" options={{ headerShown: false }} />
+                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                    <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+                  </Stack>
 
-                <StatusBar style="light" />
+                  <StatusBar style="light" />
 
-                <Toast />
-              </>
-            </NavigationThemeWrapper>
-          </ThemeProvider>
+                  <Toast />
+                </>
+              </NavigationThemeWrapper>
+            </ThemeProvider>
+          </VoiceSettingsProvider>
         </AuthProvider>
       </NavigationProvider>
     </HelmetProvider>

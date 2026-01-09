@@ -36,6 +36,7 @@ export default function SettingsScreen() {
 
   const [openSections, setOpenSections] = useState({
     theme: true,
+    voice: true, // Voice Assistant section
     special: true,
     personalization: false,
   });
@@ -133,6 +134,24 @@ export default function SettingsScreen() {
           )}
         </View>
       )}
+
+      {/* -------------------------- */}
+      {/* ASSISTENTE VOCALE */}
+      {/* -------------------------- */}
+
+      <TouchableOpacity
+        style={styles.sectionHeader}
+        onPress={() => toggleSection("voice")}
+      >
+        <Text style={styles.sectionTitle}>🎙️ Assistente Vocale</Text>
+        <Feather
+          name={openSections.voice ? "chevron-up" : "chevron-down"}
+          size={22}
+          color="#E85A2A"
+        />
+      </TouchableOpacity>
+
+      {openSections.voice && <VoiceSettingsSection />}
 
       {/* -------------------------- */}
       {/* FUNZIONI SPECIALI */}
@@ -249,7 +268,7 @@ const SettingSwitch = ({
   value,
   onChange,
 }: SettingSwitchProps) => (
-  <View style={styles.switchContainer}>
+  <View style= {styles.switchContainer}>
     <View style={{ flex: 1 }}>
       <Text style={styles.switchLabel}>{label}</Text>
       <Text style={styles.switchDesc}>{desc}</Text>
@@ -257,6 +276,158 @@ const SettingSwitch = ({
     <Switch value={value} onValueChange={onChange} />
   </View>
 );
+
+/* -------------------------------------------------------- */
+/* VOICE SETTINGS SECTION */
+/* -------------------------------------------------------- */
+
+import { useVoiceSettings } from "@/contexts/VoiceSettingsContext";
+import { SUPPORTED_LANGUAGES } from "@/types/voice";
+import { ttsService } from "@/services/TTSService";
+
+const VoiceSettingsSection = () => {
+  const { settings, updateSettings } = useVoiceSettings();
+
+  const handleTestVoice = () => {
+    const testText = {
+      it: "Svolta a destra tra 100 metri",
+      en: "Turn right in 100 meters",
+      fr: "Tournez à droite dans 100 mètres",
+      de: "Rechts abbiegen in 100 Meter",
+      es: "Gire a la derecha en 100 metros",
+    }[settings.language] || "Test voce";
+
+    ttsService.speak(testText, 2);
+  };
+
+  return (
+    <View style={styles.sectionContent}>
+      {/* Abilita/Disabilita */}
+      <SettingSwitch
+        label="Abilita Assistente Vocale"
+        desc="Attiva le istruzioni vocali durante la navigazione"
+        value={settings.enabled}
+        onChange={(v) => updateSettings({ enabled: v })}
+      />
+
+      {/* Lingua */}
+      <Text style={styles.subSectionTitle}>Lingua</Text>
+      <View style={styles.languageGrid}>
+        {SUPPORTED_LANGUAGES.map((lang) => (
+          <TouchableOpacity
+            key={lang.code}
+            onPress={() => updateSettings({ language: lang.code })}
+            style={[
+              styles.languageButton,
+              settings.language === lang.code && styles.languageButtonActive,
+            ]}
+          >
+            <Text style={styles.languageFlag}>{lang.flag}</Text>
+            <Text style={styles.languageName}>{lang.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Frequenza */}
+      <Text style={styles.subSectionTitle}>Frequenza Indicazioni</Text>
+      <View style={styles.frequencyButtons}>
+        {[
+          { value: "minimal", label: "Minimale" },
+          { value: "standard", label: "Standard" },
+          { value: "verbose", label: "Completa" },
+        ].map((freq) => (
+          <TouchableOpacity
+            key={freq.value}
+            onPress={() =>
+              updateSettings({ frequency: freq.value as any })
+            }
+            style={[
+              styles.frequencyButton,
+              settings.frequency === freq.value && styles.frequencyButtonActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.frequencyText,
+                settings.frequency === freq.value &&
+                  styles.frequencyTextActive,
+              ]}
+            >
+              {freq.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Velocità Voce */}
+      <Text style={styles.subSectionTitle}>Velocità Voce</Text>
+      <View style={styles.frequencyButtons}>
+        {[
+          { value: 0.8, label: "Lento" },
+          { value: 1.0, label: "Normale" },
+          { value: 1.2, label: "Veloce" },
+        ].map((sp) => (
+          <TouchableOpacity
+            key={sp.value}
+            onPress={() => updateSettings({ speed: sp.value })}
+            style={[
+              styles.frequencyButton,
+              settings.speed === sp.value && styles.frequencyButtonActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.frequencyText,
+                settings.speed === sp.value &&
+                  styles.frequencyTextActive,
+              ]}
+            >
+              {sp.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Volume */}
+      <Text style={styles.subSectionTitle}>Volume</Text>
+      <View style={styles.frequencyButtons}>
+        {[
+          { value: 0.5, label: "Basso" },
+          { value: 0.7, label: "Medio" },
+          { value: 0.9, label: "Alto" },
+        ].map((vol) => (
+          <TouchableOpacity
+            key={vol.value}
+            onPress={() => updateSettings({ volume: vol.value })}
+            style={[
+              styles.frequencyButton,
+              settings.volume === vol.value && styles.frequencyButtonActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.frequencyText,
+                settings.volume === vol.value &&
+                  styles.frequencyTextActive,
+              ]}
+            >
+              {vol.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Test Button */}
+      <TouchableOpacity
+        onPress={handleTestVoice}
+        style={styles.testButton}
+      >
+        <Feather name="volume-2" size={18} color="white" />
+        <Text style={styles.testButtonText}>Prova Voce</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 /* -------------------------------------------------------- */
 /* THEME PREVIEW */
@@ -411,5 +582,97 @@ const styles = StyleSheet.create({
   previewLabel: {
     fontSize: 13,
     opacity: 0.8,
+  },
+
+  // Voice Settings Styles
+  subSectionTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#fff",
+    marginTop: 16,
+    marginBottom: 10,
+  },
+
+  languageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+
+  languageButton: {
+    flex: 1,
+    minWidth: "30%",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: "#181818",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+
+  languageButtonActive: {
+    borderColor: "#E85A2A",
+    backgroundColor: "#2A1A14",
+  },
+
+  languageFlag: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+
+  languageName: {
+    fontSize: 12,
+    color: "#fff",
+  },
+
+  frequencyButtons: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+
+  frequencyButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#181818",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+
+  frequencyButtonActive: {
+    borderColor: "#E85A2A",
+    backgroundColor: "#2A1A14",
+  },
+
+  frequencyText: {
+    fontSize: 13,
+    color: "#bbb",
+  },
+
+  frequencyTextActive: {
+    color: "#E85A2A",
+    fontWeight: "600",
+  },
+
+  testButton: {
+    marginTop: 16,
+    backgroundColor: "#E85A2A",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+
+  testButtonText: {
+    color: "white",
+    fontSize: 15,
+    fontWeight: "600",
   },
 });
