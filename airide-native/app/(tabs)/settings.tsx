@@ -283,7 +283,7 @@ const SettingSwitch = ({
 
 import { useVoiceSettings } from "@/contexts/VoiceSettingsContext";
 import { SUPPORTED_LANGUAGES } from "@/types/voice";
-import { ttsService } from "@/services/TTSService";
+import { ttsService, getLanguageCode } from "@/services/TTSService";
 
 const VoiceSettingsSection = () => {
   const { settings, updateSettings } = useVoiceSettings();
@@ -297,7 +297,12 @@ const VoiceSettingsSection = () => {
       es: "Gire a la derecha en 100 metros",
     }[settings.language] || "Test voce";
 
-    ttsService.speak(testText, 2);
+    // IMPORTANTE: Passa anche le opzioni di lingua, velocità e volume
+    ttsService.speak(testText, 2, {
+      language: getLanguageCode(settings.language),
+      rate: settings.speed,
+      volume: settings.volume,
+    });
   };
 
   return (

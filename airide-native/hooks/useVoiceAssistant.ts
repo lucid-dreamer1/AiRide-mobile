@@ -22,7 +22,7 @@ interface UseVoiceAssistantProps {
  * 
  * Trigger vocali:
  * - Nuova istruzione (testo cambiato)
- * - Distanze critiche raggiunge (200m, 100m, 50m)
+ * - Distanze critiche raggiunte solo UNA volta (200m, 100m, 50m)
  * - Messaggi speciali (ricalcolo, arrivo)
  */
 export function useVoiceAssistant({
@@ -33,8 +33,11 @@ export function useVoiceAssistant({
   
   // Traccia l'ultima istruzione vocalizzata per evitare ripetizioni
   const lastSpokenText = useRef<string | null>(null);
-  const lastSpokenDistance = useRef<number | null>(null);
-  const distanceThresholds = useRef<Set<number>>(new Set());
+  const lastSpokenAt = useRef<number>(0);
+  
+  // Traccia per quale istruzione abbiamo già parlato (per evitare ripetizioni della stessa istruzione)
+  const currentInstructionId = useRef<string | null>(null);
+  const spokenThresholds = useRef<Set<number>>(new Set());
 
   // Aggiorna le impostazioni TTS quando cambiano
   useEffect(() => {
@@ -60,44 +63,91 @@ export function useVoiceAssistant({
 
     const currentDistance = instruction.metri ?? 0;
     const currentText = instruction.testo || instruction.text || '';
+    
+    // Crea un ID univoco per questa istruzione (basato sul testo)
+    const instructionId = currentText;
 
-    // Nuova istruzione (testo diverso)
-    const isNewInstruction = currentText !== lastSpokenText.current;
+    // NUOVA ISTRUZIONE: Il testo è cambiato
+    const isNewInstruction = instructionId !== currentInstructionId.current;
     
     if (isNewInstruction) {
-      // Reset soglie per nuova istruzione
-      distanceThresholds.current.clear();
-      lastSpokenText.current = currentText;
-      lastSpokenDistance.current = currentDistance;
-
-      // Vocalizza immediatamente
-      speakInstruction(instruction);
+      console.log(`[VoiceAssistant] 🆕 Nuova istruzione rilevata: "${currentText}"`);
+      
+      // Reset per nuova istruzione
+      currentInstructionId.current = instructionId;
+      spokenThresholds.current.clear();
+      lastSpokenText.current = null;
+      
+      // Vocalizza solo se siamo a una distanza ragionevole (non troppo lontana)
+      // Evita di parlare se siamo a più di 500m dalla svolta
+      if (currentDistance > 0 && currentDistance <= 500) {
+        speakInstruction(instruction);
+        lastSpokenText.current = currentText;
+        lastSpokenAt.current = Date.now();
+        
+        // Marca questa distanza come già vocalizzata
+        const threshold = getClosestThreshold(currentDistance);
+        if (threshold) {
+          spokenThresholds.current.add(threshold);
+        }
+      }
       return;
     }
 
-    // Stessa istruzione: vocalizza a soglie di distanza specifiche
-    if (shouldSpeakAtDistance(currentDistance)) {
+    // STESSA ISTRUZIONE: Vocalizza solo a soglie specifiche NON ancora raggiunte
+    const now = Date.now();
+    const timeSinceLastSpoken = now - lastSpokenAt.current;
+    
+    // Cooldown minimo di 5 secondi tra vocalizzazioni
+    if (timeSinceLastSpoken < 5000) {
+      return;
+    }
+
+    // Verifica se abbiamo raggiunto una nuova soglia
+    const newThreshold = shouldSpeakAtThreshold(currentDistance);
+    
+    if (newThreshold && !spokenThresholds.current.has(newThreshold)) {
+      console.log(`[VoiceAssistant] 📏 Soglia ${newThreshold}m raggiunta`);
+      spokenThresholds.current.add(newThreshold);
       speakInstruction(instruction);
-      lastSpokenDistance.current = currentDistance;
+      lastSpokenText.current = currentText;
+      lastSpokenAt.current = now;
     }
 
   }, [instruction, enabled, settings]);
 
   /**
-   * Determina se vocalizzare alla distanza corrente
+   * Trova la soglia più vicina alla distanza corrente
    */
-  const shouldSpeakAtDistance = (distance: number): boolean => {
+  const getClosestThreshold = (distance: number): number | null => {
+    const thresholds = [200, 100, 50];
+    
+    for (const threshold of thresholds) {
+      // Se siamo entro 10 metri dalla soglia, consideriamola raggiunta
+      if (Math.abs(distance - threshold) <= 10) {
+        return threshold;
+      }
+    }
+    
+    return null;
+  };
+
+  /**
+   * Determina se vocalizzare alla distanza corrente
+   * Ritorna la soglia se dovremmo parlare, null altrimenti
+   */
+  const shouldSpeakAtThreshold = (distance: number): number | null => {
     // Soglie di avviso: 200m, 100m, 50m
     const thresholds = [200, 100, 50];
     
     for (const threshold of thresholds) {
-      if (distance <= threshold && !distanceThresholds.current.has(threshold)) {
-        distanceThresholds.current.add(threshold);
-        return true;
+      // Se siamo tra threshold-10 e threshold+10, e non abbiamo ancora parlato per questa soglia
+      if (distance <= threshold + 10 && distance >= threshold - 10) {
+        return threshold;
       }
     }
     
-    return false;
+    return null;
   };
 
   /**
@@ -114,10 +164,15 @@ export function useVoiceAssistant({
     const priority = getPriorityLevel(inst);
     
     console.log(
-      `[VoiceAssistant] 🎙️ Vocalizzazione: "${voiceText}" (Priority: ${priority}, Distance: ${inst.metri}m)`
+      `[VoiceAssistant] 🎙️ Vocalizzazione: "${voiceText}" (Priority: ${priority}, Distance: ${inst.metri}m, Language: ${settings.language})`
     );
 
-    ttsService.speak(voiceText, priority);
+    // IMPORTANTE: Passa la lingua corretta al TTS
+    ttsService.speak(voiceText, priority, {
+      language: getLanguageCode(settings.language), // Usa la lingua dalle impostazioni utente
+      rate: settings.speed,
+      volume: settings.volume,
+    });
   };
 
   // Cleanup quando il componente viene smontato

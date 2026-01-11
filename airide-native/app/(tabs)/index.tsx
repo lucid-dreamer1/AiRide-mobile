@@ -35,7 +35,7 @@ import useNavigationUpdater from "@/hooks/useNavigationUpdater";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useVoiceSettings } from "@/contexts/VoiceSettingsContext";
 
-const DEMO_MODE = true;
+const DEMO_MODE = false;
 
 type Point = { latitude: number; longitude: number };
 
@@ -255,7 +255,8 @@ export default function HomeScreen() {
       const p2 = routeCoords[index + 1];
       if (!p2) return;
 
-      let newT = t + 0.05 * demoSpeed;
+      // Incremento più piccolo per movimento più fluido
+      let newT = t + 0.02 * demoSpeed;
       let newIndex = index;
 
       if (newT >= 1) {
@@ -269,8 +270,8 @@ export default function HomeScreen() {
 
       const now = Date.now();
 
-      if (now - lastGPSUpdate.current > 300) {
-        lastGPSUpdate.current = now;
+      // GPS update throttle aumentato per stabilità
+      if (now - lastGPSUpdate.current > 800) {
         lastGPSUpdate.current = now;
         updatePosition(pos.latitude, pos.longitude).then((res) => {
           if (res?.nav) {
@@ -288,17 +289,18 @@ export default function HomeScreen() {
         });
       }
 
-      if (now - lastCameraUpdate.current > 350) {
+      // Camera update meno frequente per evitare sfarfallio
+      if (now - lastCameraUpdate.current > 500) {
         lastCameraUpdate.current = now;
         mapRef.current?.animateCamera(
           { center: pos, zoom: 16 },
-          { duration: 180 }
+          { duration: 400 } // Durata più lunga per transizione più smooth
         );
       }
 
       demoIndexRef.current = newIndex;
       demoTRef.current = newT;
-    }, 110);
+    }, 150); // Intervallo aumentato da 110ms a 150ms per più stabilità
 
     return () => clearInterval(interval);
   }, [routeCoords, demoSpeed, demoCanStart]);
