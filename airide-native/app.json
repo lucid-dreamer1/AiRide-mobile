@@ -92,7 +92,8 @@
           "bluetoothAlwaysPermission": "L'app vuole connettersi a dispositivi Bluetooth"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/withVoskModule"
     ],
     "experiments": {
       "typedRoutes": true,

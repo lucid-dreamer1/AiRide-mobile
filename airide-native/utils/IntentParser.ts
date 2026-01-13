@@ -16,8 +16,28 @@ export class IntentParser {
   private navRegex = /portami a (.*)/i;
   private changeRegex = /cambia percorso/i;
   private avoidHighwaysRegex = /evita autostrade/i;
-  private cancelRegex = /annulla navigazione/i;
+  private cancelRegex = /(annulla|elimina|cancella)\s+(la\s+)?(navigazione|rotta|rutta|percorso)/i;
   private backRegex = /torna alla rotta precedente/i;
+
+  /**
+   * Normalizza l'indirizzo dal formato parlato al formato "indirizzo, città"
+   * Esempio: "san prisco in via circumvallazione 65" -> "via circumvallazione 65, san prisco"
+   */
+  private normalizeAddress(rawAddress: string): string {
+    // Pattern: "[città] in via/viale/piazza/corso [indirizzo]"
+    const addressPattern = /^(.+?)\s+in\s+(via|viale|piazza|corso|largo|vicolo)\s+(.+)$/i;
+    const match = rawAddress.match(addressPattern);
+    
+    if (match) {
+      const city = match[1].trim();
+      const streetType = match[2].trim();
+      const streetAddress = match[3].trim();
+      return `${streetType} ${streetAddress}, ${city}`;
+    }
+    
+    // Se non matcha il pattern, ritorna l'indirizzo così com'è
+    return rawAddress;
+  }
 
   parse(text: string): VoiceIntent {
     const cleanText = text.trim().toLowerCase();
@@ -25,7 +45,9 @@ export class IntentParser {
     // Verifica "portami a..."
     const navMatch = cleanText.match(this.navRegex);
     if (navMatch) {
-      return { type: 'NAVIGATE_TO', destination: navMatch[1] || 'destinazione' };
+      const rawDestination = navMatch[1] || 'destinazione';
+      const destination = this.normalizeAddress(rawDestination);
+      return { type: 'NAVIGATE_TO', destination };
     }
 
     // Verifica "evita autostrade"

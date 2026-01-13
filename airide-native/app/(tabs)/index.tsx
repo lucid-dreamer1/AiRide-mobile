@@ -36,7 +36,7 @@ import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useVoiceCommand } from "@/hooks/useVoiceCommand";
 import { useVoiceSettings } from "@/contexts/VoiceSettingsContext";
 
-const DEMO_MODE = true;
+const DEMO_MODE = false;
 
 type Point = { latitude: number; longitude: number };
 
