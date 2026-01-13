@@ -1,0 +1,180 @@
+--------- beginning of main
+01-12 18:58:25.567  2319  3063 I ScanController: onScanResult to scannerId: 11- eventType=0x1a, addressType=1, address=XX:XX:XX:XX:E8:44, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-79, periodicAdvInt=0x0
+01-12 18:58:25.571 22034 11472 I NearbyConnections: Found BleAdvertisement [ 0x23 0x4b 0x57 0x54 0x45 0x11 0x34 0x07 0x8a 0x69 0xbe 0x83 0xa4 0x0c 0x11 0x37 0xb5 0xd0 0xe9 0x34 0x9d 0x6d 0x9f ] (with EndpointId KWTE and EndpointInfo [ 0x34 0x07 0x8a 0x69 0xbe 0x83 0xa4 0x0c 0x11 0x37 0xb5 0xd0 0xe9 0x34 0x9d 0x6d 0x9f ])
+01-12 18:58:25.571 22034 11472 I NearbyConnections: Unable to record discovered endpoint due to null currentDiscoveryPhase
+01-12 18:58:25.571 22034 11472 I NearbyConnections: ClientProxy(164037317 0p:com.google.android.gms.nearby.sharing) reporting onEndpointFound(KWTE)
+01-12 18:58:25.572 22034 11472 I NearbyConnections: ClientProxy(164037317) reporting onEndpointDistanceChanged(KWTE, UNKNOWN)
+01-12 18:58:25.573 22034 11472 I NearbySharing: NearbySharing Internal event EndpointDiscovered(endpointId=KWTE)
+01-12 18:58:25.881   857   878 E HeatmapThread: ECT Thread time in milliseconds: 1768240705
+01-12 18:58:25.885   857   878 D HeatmapThread: !@ batteryplugType : 2
+01-12 18:58:25.885   857   878 D HeatmapThread: !@ batteryLevel : 21  batteryTemperature : 272 
+01-12 18:58:25.885   857   878 D HeatmapThread: !@ Heatmap currtime: 29470678
+01-12 18:58:25.885   857   878 D HeatmapThread: !@ Heatmap prevtime: 29470652
+01-12 18:58:25.886   857   878 D HeatmapThread: !@ Heatmap plugstarttime: 29470648
+01-12 18:58:25.886   857   878 D HeatmapThread: !@ Heatmap prevv_dsoh_update_time: 29469952
+01-12 18:58:25.886   857   878 E HeatmapThread: !@ CAM New BSOH: 100
+--------- beginning of system
+01-12 18:58:26.250   578   578 D io_stats: !@   8,0 r 321542072 6351494342 w 56069186 729392532 d 8423744 742494860 f 4271354 4320302 iot 132975684 0 th 0 0 0 pt 0 inp 0 0 1443223.824
+01-12 18:58:26.251   578   578 D io_stats: !@ Read_top(KB): android.vending(27625) 2280 ocessService0:0(7662) 184 android.mdx.kit(13377) 104
+01-12 18:58:26.251   578   578 D io_stats: !@ Write_top(KB): kworker/u16:0(8492) 72 id.diagmonagent(7315) 44 jbd2/sda2-8(573) 8
+01-12 18:58:26.530  1135  1759 D SemWifiSwitchForIndividualAppsService: isSkipNetworkCondition - result:2
+01-12 18:58:26.585  2292  3017 D SatelliteController: isInCarrierRoamingNbIotNtn: satellite is disabled
+01-12 18:58:26.593  2691  2691 I EPDG -- SIM0 [SMARTCELLULAR]: onSignalStrengthsChanged: SignalStrength:{mCdma=Invalid,mGsm=Invalid,mWcdma=Invalid,mTdscdma=Invalid,mLte=CellSignalStrengthLte: rssi=-113 rsrp=-112 rsrq=-15 rssnr=-2 cqiTableIndex=1 cqi=6 ta=2147483647 level=2 parametersUseForLevel=0,mNr=Invalid,SignalBarInfo{ lteLevel=1 },rat=14,primary=CellSignalStrengthLte}
+01-12 18:58:26.595  2691  3889 I EPDG -- SIM0 [SMARTCELLULAR]: lastLteRSRP is -114 currentLteRSRP is -112 lastLteRSRQ is -17 currentLteRSRQ is -15 lastLteSNR is -5 currentLteSNR is -2
+01-12 18:58:26.596  2691  3428 I EPDG -- SIM0 [EpdgRunnable]: Start mWiFiMeasurement
+01-12 18:58:26.597  2691  3428 I EPDG -- SIM0 [EpdgSubscription]: getIsImsCallConnected: returning: false
+01-12 18:58:26.881   857   878 E HeatmapThread: ECT Thread time in milliseconds: 1768240706
+01-12 18:58:26.885   857   878 D HeatmapThread: !@ batteryplugType : 2
+01-12 18:58:26.885   857   878 D HeatmapThread: !@ batteryLevel : 21  batteryTemperature : 272 
+01-12 18:58:26.885   857   878 D HeatmapThread: !@ Heatmap currtime: 29470678
+01-12 18:58:26.886   857   878 D HeatmapThread: !@ Heatmap prevtime: 29470652
+01-12 18:58:26.886   857   878 D HeatmapThread: !@ Heatmap plugstarttime: 29470648
+01-12 18:58:26.886   857   878 D HeatmapThread: !@ Heatmap prevv_dsoh_update_time: 29469952
+01-12 18:58:26.887   857   878 E HeatmapThread: !@ CAM New BSOH: 100
+01-12 18:58:27.554  1135  1759 D SemWifiSwitchForIndividualAppsService: isSkipNetworkCondition - result:2
+01-12 18:58:27.739  2319  3063 I ScanController: onScanResult to scannerId: 11- eventType=0x0, addressType=1, address=XX:XX:XX:XX:FD:09, primaryPhy=1, secondaryPhy=1, advertisingSid=0x1, txPower=127, rssi=-84, periodicAdvInt=0x0
+01-12 18:58:27.743  2319  3063 I ScanController: onScanResult to scannerId: 11- eventType=0x10, addressType=1, address=XX:XX:XX:XX:C6:81, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-82, periodicAdvInt=0x0
+01-12 18:58:27.880   857   878 E HeatmapThread: ECT Thread time in milliseconds: 1768240707
+01-12 18:58:27.884   857   878 D HeatmapThread: !@ batteryplugType : 2
+01-12 18:58:27.884   857   878 D HeatmapThread: !@ batteryLevel : 21  batteryTemperature : 272 
+01-12 18:58:27.885   857   878 D HeatmapThread: !@ Heatmap currtime: 29470678
+01-12 18:58:27.885   857   878 D HeatmapThread: !@ Heatmap prevtime: 29470652
+01-12 18:58:27.885   857   878 D HeatmapThread: !@ Heatmap plugstarttime: 29470648
+01-12 18:58:27.885   857   878 D HeatmapThread: !@ Heatmap prevv_dsoh_update_time: 29469952
+01-12 18:58:27.885   857   878 E HeatmapThread: !@ CAM New BSOH: 100
+01-12 18:58:28.029  2319  3063 I ScanController: onScanResult to scannerId: 11- eventType=0x10, addressType=1, address=XX:XX:XX:XX:C6:81, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-74, periodicAdvInt=0x0
+01-12 18:58:28.253   578   578 D io_stats: !@   8,0 r 321542074 6351494470 w 56069198 729392640 d 8423744 742494860 f 4271354 4320302 iot 132975712 0 th 0 0 0 pt 0 inp 0 0 1443225.826
+01-12 18:58:28.284  2691  3428 I EPDG -- SIM0 [SMARTWIFI]: isProfiling, hash=165575599, started=true
+01-12 18:58:28.284  2691  3428 I EPDG -- SIM0 [SMARTWIFI]: isProfiling, hash=165575599, started=true
+01-12 18:58:28.287  2691  3428 I EPDG -- SIM0 [SMARTWIFI]: Rssi : -70 highrange : -68 lowrange : -74 mIsRssiInHystersis : true
+01-12 18:58:28.287  2691  3428 I EPDG -- SIM0 [SMARTWIFI]: Rssi : -68 highrange : -68 lowrange : -74 mIsRssiInHystersis : true
+01-12 18:58:28.330  1135  1637 D WifiStaIfaceHidlImpl: getCachedScanData is not implemented by HIDL
+01-12 18:58:28.340  1135  3241 D SemWifiUsabilityStatsMonitor: onWifiUsabilityStats - seqNum 206893, isSameBssidAndFreq true
+01-12 18:58:28.341  2691  2691 I EPDG -- SIM0 [SMARTWIFI]: isProfiling, hash=165575599, started=true
+01-12 18:58:28.341  2691  2691 I EPDG -- SIM0 [SMARTWIFI]: isProfiling, hash=165575599, started=true
+01-12 18:58:28.343  1135  1736 I SemWifiLinkQualityMonitor: Link stat: 2169 / 0 / 1,27 (19) / 117 / -67.0 || 100.0 : 117,00 / 0.5 : 0,79 / 0.55 : 0,00 / G (G) || b42b016d5220: 0,140 / 56,990 / N || N V / 0 0 / N 2.0 / N X 0 / 1443225914 0 || 2026-01-12 18:58:27  / 0: 0 0 0 0 0 0 / 1: 0 0 0 0 0 0 / 0: 0 0 0 0 0 0
+01-12 18:58:28.343  2691  2691 I EPDG -- SIM0 [SMARTWIFI]: Rssi : -67 highrange : -68 lowrange : -74 mIsRssiInHystersis : false
+01-12 18:58:28.344  2691  2691 I EPDG -- SIM0 [SMARTWIFI]: Rssi : -67 highrange : -68 lowrange : -74 mIsRssiInHystersis : false
+01-12 18:58:28.344  2691  2691 I EPDG -- SIM0 [SMARTWIFI]: getHandoverThresholdMet: value is: false
+01-12 18:58:28.463 22034 11625 I NearbyMediums: Found Fast Ble Advertisements :
+01-12 18:58:28.463 22034 11625 I NearbyMediums: BleAdvertisement { version=2, socketVersion=2, isFast=true, serviceIdHash=null, data=[ 0x23 0x36 0x46 0x57 0x46 0x11 0x32 0x41 0x25 0xee 0x0e 0x9e 0xb1 0x24 0x38 0x57 0x96 0x70 0x21 0x7c 0x0e 0x2a 0xe7 ], deviceToken=[ 0xec 0x48 ], rxAdvertisement=null } : 1 times.
+01-12 18:58:28.463 22034 11625 I NearbyMediums: BleAdvertisement { version=2, socketVersion=2, isFast=true, serviceIdHash=null, data=[ 0x23 0x4b 0x57 0x54 0x45 0x11 0x34 0x07 0x8a 0x69 0xbe 0x83 0xa4 0x0c 0x11 0x37 0xb5 0xd0 0xe9 0x34 0x9d 0x6d 0x9f ], deviceToken=[ 0xf1 0x62 ], rxAdvertisement=null } : 1 times.
+01-12 18:58:28.463 22034 11625 I NearbyMediums: BleAdvertisement { version=2, socketVersion=2, isFast=true, serviceIdHash=null, data=[ 0x23 0x30 0x45 0x51 0x35 0x11 0x32 0x4d 0xb9 0x13 0xf3 0xb5 0x45 0xec 0x34 0xdd 0xa5 0x91 0xe6 0x0c 0x79 0x23 0xc2 ], deviceToken=[ 0xb3 0x6f ], rxAdvertisement=null } : 8 times.
+01-12 18:58:28.463 22034 11625 I NearbyMediums: Total 10 fast advertisements from 3 unique advertisers.
+01-12 18:58:28.463 22034 11625 I NearbyMediums: Current Tracked Scanning Clients are : {NearbyConnections.EnvironmentMonitor, NearbySharing, NearbyConnections.TxAdvertisement}
+01-12 18:58:28.576  1135  1759 D SemWifiSwitchForIndividualAppsService: isSkipNetworkCondition - result:2
+01-12 18:58:28.639  5928  6119 W LibevQuicAsyncUDPSocket.h: setTosOrTrafficClass not implemented in LibevQuicAsyncUDPSocket
+01-12 18:58:28.642  1135  1788 D NetdEventListenerService: DNS Requested by 214, 10322(com.instagram.android), 4(FAIL), isBlocked=true, 0ms
+01-12 18:58:28.645  5928  6119 E MvfstCallbacks.cpp: onConnectionSetupError: error=TransportError: Internal Error, Error on socket write Operation not permitted, 
+01-12 18:58:28.646  5928  6119 W LibevQuicAsyncUDPSocket.h: setTosOrTrafficClass not implemented in LibevQuicAsyncUDPSocket
+01-12 18:58:28.659  5928  6119 E MvfstCallbacks.cpp: onConnectionSetupError: error=TransportError: Internal Error, Error on socket write Operation not permitted, 
+01-12 18:58:28.665  1135  1788 D NetdEventListenerService: DNS Requested by 214, 10322(com.instagram.android), 4(FAIL), isBlocked=true, 0ms
+01-12 18:58:28.734  5928  6119 W LibevQuicAsyncUDPSocket.h: setTosOrTrafficClass not implemented in LibevQuicAsyncUDPSocket
+01-12 18:58:28.736  1135  1788 D NetdEventListenerService: DNS Requested by 214, 10322(com.instagram.android), 4(FAIL), isBlocked=true, 0ms
+01-12 18:58:28.740  5928  6119 E MvfstCallbacks.cpp: onConnectionSetupError: error=TransportError: Internal Error, Error on socket write Operation not permitted, 
+01-12 18:58:28.740  5928  6119 W LibevQuicAsyncUDPSocket.h: setTosOrTrafficClass not implemented in LibevQuicAsyncUDPSocket
+01-12 18:58:28.746  5928  6119 E MvfstCallbacks.cpp: onConnectionSetupError: error=TransportError: Internal Error, Error on socket write Operation not permitted, 
+01-12 18:58:28.881   857   878 E HeatmapThread: ECT Thread time in milliseconds: 1768240708
+01-12 18:58:28.885   857   878 D HeatmapThread: !@ batteryplugType : 2
+01-12 18:58:28.885   857   878 D HeatmapThread: !@ batteryLevel : 21  batteryTemperature : 272 
+01-12 18:58:28.886   857   878 D HeatmapThread: !@ Heatmap currtime: 29470678
+01-12 18:58:28.886   857   878 D HeatmapThread: !@ Heatmap prevtime: 29470652
+01-12 18:58:28.886   857   878 D HeatmapThread: !@ Heatmap plugstarttime: 29470648
+01-12 18:58:28.886   857   878 D HeatmapThread: !@ Heatmap prevv_dsoh_update_time: 29469952
+01-12 18:58:28.886   857   878 E HeatmapThread: !@ CAM New BSOH: 100
+01-12 18:58:28.913   866   866 I SurfaceFlinger: SFWD update time=1443226487793719
+01-12 18:58:29.404   825   881 I SensorsHub: context 10 0 9 1,1,26,3,3,219,90,237,1,2, 1788732977846142
+01-12 18:58:29.407  1135  1623 D CAE     : onGetSensorHubData(SensorHubParserProvider.java:92) - onGetSensorHubData Event [event buffer len :10], AP_WAKEUP
+01-12 18:58:29.407  1135  1623 I CAE     : parse(SensorHubParserProvider.java:188) - buffer size = 10
+01-12 18:58:29.407  1135  1623 I CAE     : parse(SensorHubParserProvider.java:199) - 1, 1, 26, 3, 3, -37, 90, -19, 1, 2,
+01-12 18:58:29.408  1135  1623 D CAE     : display(ContextProvider.java:375) - ================= ACTIVITY_TRACKER =================
+01-12 18:58:29.409  1135  1623 I CAE     : display(ContextProvider.java:391) - Accuracy=[2], OperationMode=[0], ActivityType=[1], TimeStamp=[1768240707309]
+01-12 18:58:29.410  1135  1623 D CAE     : display(ContextProvider.java:375) - ================= ACTIVITY_TRACKER_INTERRUPT =================
+01-12 18:58:29.410  1135  1623 I CAE     : display(ContextProvider.java:391) - Accuracy=[2], OperationMode=[1], ActivityType=[1], TimeStamp=[1768240707309]
+01-12 18:58:29.411  1135  1620 D SemContextService: Service.updateContext() : service = Activity Tracker
+01-12 18:58:29.411  1135  1135 D SemContextManager: onSemContextChanged() : event = Activity Tracker
+01-12 18:58:29.412  1135  1135 E PocketMotionManager: activity tracker 1, 2
+01-12 18:58:29.412  1135  1620 D SemContextService: Service.updateContext() : service = Activity Notification
+01-12 18:58:29.413  1135  4432 D SemContextManager: onSemContextChanged() : event = Activity Notification
+01-12 18:58:29.470   825   881 I SensorsHub: context 14 0 13 1,1,26,4,3,218,225,204,1,4,0,0,121,33, 1788733043660604
+01-12 18:58:29.473  1135  1623 D CAE     : onGetSensorHubData(SensorHubParserProvider.java:92) - onGetSensorHubData Event [event buffer len :14], AP_WAKEUP
+01-12 18:58:29.473  1135  1623 I CAE     : parse(SensorHubParserProvider.java:188) - buffer size = 14
+01-12 18:58:29.474  1135  1623 I CAE     : parse(SensorHubParserProvider.java:199) - 1, 1, 26, 4, 3, -38, -31, -52, 1, 4, 0, 0, 121, 33,
+01-12 18:58:29.474  1135  1623 W CAE     : parse(ActivityTrackerBatchRunner.java:239) - parse start
+01-12 18:58:29.475  1135  1623 I CAE     : getMostActivity(ActivityTrackerBatchRunner.java:324) - size:1
+01-12 18:58:29.475  1135  1623 D CAE     : display(ContextProvider.java:375) - ================= ACTIVITY_TRACKER_BATCH =================
+01-12 18:58:29.475  1135  1623 I CAE     : display(ContextProvider.java:391) - Accuracy=[0], Duration=[31009], Count=[1], OperationMode=[2], ActivityType=[4], MostActivity=[1], TimeStamp=[1768240676300]
+01-12 18:58:29.476  1135  1623 W CAE     : parse(ActivityTrackerBatchRunner.java:310) - parse end
+01-12 18:58:29.477  1135  1620 D SemContextService: Service.updateContext() : service = Activity Batch
+01-12 18:58:29.601  1135  1759 D SemWifiSwitchForIndividualAppsService: isSkipNetworkCondition - result:2
+01-12 18:58:29.881   857   878 E HeatmapThread: ECT Thread time in milliseconds: 1768240709
+01-12 18:58:29.885   857   878 D HeatmapThread: !@ batteryplugType : 2
+01-12 18:58:29.886   857   878 D HeatmapThread: !@ batteryLevel : 21  batteryTemperature : 272 
+01-12 18:58:29.886   857   878 D HeatmapThread: !@ Heatmap currtime: 29470678
+01-12 18:58:29.886   857   878 D HeatmapThread: !@ Heatmap prevtime: 29470652
+01-12 18:58:29.886   857   878 D HeatmapThread: !@ Heatmap plugstarttime: 29470648
+01-12 18:58:29.887   857   878 D HeatmapThread: !@ Heatmap prevv_dsoh_update_time: 29469952
+01-12 18:58:29.887   857   878 E HeatmapThread: !@ CAM New BSOH: 100
+01-12 18:58:30.255   578   578 D io_stats: !@   8,0 r 321542074 6351494470 w 56069206 729392668 d 8423744 742494860 f 4271354 4320303 iot 132975724 0 th 0 0 0 pt 0 inp 0 0 1443227.829
+01-12 18:58:30.255   578   578 D io_stats: !@ Read_top(KB): ocessService0:0(7662) 128
+01-12 18:58:30.256   578   578 D io_stats: !@ Write_top(KB): kworker/u16:3(25243) 64 sait.sohservice(19208) 48 droid.rubin.app(19188) 20
+01-12 18:58:30.626  1135  1759 D SemWifiSwitchForIndividualAppsService: isSkipNetworkCondition - result:2
+01-12 18:58:30.771  2319  3063 I ScanController: onScanResult to scannerId: 11- eventType=0x10, addressType=1, address=XX:XX:XX:XX:EE:1E, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-60, periodicAdvInt=0x0
+01-12 18:58:30.881   857   878 E HeatmapThread: ECT Thread time in milliseconds: 1768240710
+01-12 18:58:30.885   857   878 D HeatmapThread: !@ batteryplugType : 2
+01-12 18:58:30.885   857   878 D HeatmapThread: !@ batteryLevel : 21  batteryTemperature : 272 
+01-12 18:58:30.886   857   878 D HeatmapThread: !@ Heatmap currtime: 29470678
+01-12 18:58:30.886   857   878 D HeatmapThread: !@ Heatmap prevtime: 29470652
+01-12 18:58:30.886   857   878 D HeatmapThread: !@ Heatmap plugstarttime: 29470648
+01-12 18:58:30.886   857   878 D HeatmapThread: !@ Heatmap prevv_dsoh_update_time: 29469952
+01-12 18:58:30.887   857   878 E HeatmapThread: !@ CAM New BSOH: 100
+01-12 18:58:31.357  1135  1637 D WifiStaIfaceHidlImpl: getCachedScanData is not implemented by HIDL
+01-12 18:58:31.361  1135  3241 D SemWifiUsabilityStatsMonitor: onWifiUsabilityStats - seqNum 206894, isSameBssidAndFreq true
+01-12 18:58:31.365  1135  1736 I SemWifiLinkQualityMonitor: Link stat: 2220 / 0 / 1,00 (9) / 144 / -67.0 || 100.0 : 144,00 / 0.5 : 1,00 / 0.55 : 0,00 / G (G) || b42b016d5220: 0,128 / 62,718 / N || N V / 0 0 / N 2.0 / N X 0 / 1443228936 0 || 2026-01-12 18:58:30  / 0: 0 0 0 0 0 0 / 1: 0 0 0 0 0 0 / 0: 0 0 0 0 0 0
+01-12 18:58:31.509   838   871 E BatteryDump: !@new_battery_dump : 3769,295,475,550,21,272,269,311,0,0,309,311,0,Charging,NO_CHARGING,Normal,Good,USB,1,Normal,0,0,9420,0x0,0x10000,0x0,0,0,0000,0000,00000000,0,0,0,0,314,3749,2140,990,0,
+01-12 18:58:31.518   838   838 I sehhealth-service: updateLrpSysfs: write: 308
+01-12 18:58:31.650  1135  1759 D SemWifiSwitchForIndividualAppsService: isSkipNetworkCondition - result:2
+01-12 18:58:31.881   857   878 E HeatmapThread: ECT Thread time in milliseconds: 1768240711
+01-12 18:58:31.885   857   878 D HeatmapThread: !@ batteryplugType : 2
+01-12 18:58:31.885   857   878 D HeatmapThread: !@ batteryLevel : 21  batteryTemperature : 272 
+01-12 18:58:31.885   857   878 D HeatmapThread: !@ Heatmap currtime: 29470678
+01-12 18:58:31.886   857   878 D HeatmapThread: !@ Heatmap prevtime: 29470652
+01-12 18:58:31.886   857   878 D HeatmapThread: !@ Heatmap plugstarttime: 29470648
+01-12 18:58:31.886   857   878 D HeatmapThread: !@ Heatmap prevv_dsoh_update_time: 29469952
+01-12 18:58:31.886   857   878 E HeatmapThread: !@ CAM New BSOH: 100
+01-12 18:58:32.258   578   578 D io_stats: !@   8,0 r 321542074 6351494470 w 56069208 729392676 d 8423744 742494860 f 4271354 4320303 iot 132975728 0 th 0 0 0 pt 0 inp 0 0 1443229.832
+01-12 18:58:32.321  2319  3063 I ScanController: onScanResult to scannerId: 11- eventType=0x0, addressType=1, address=XX:XX:XX:XX:FD:09, primaryPhy=1, secondaryPhy=1, advertisingSid=0x1, txPower=127, rssi=-81, periodicAdvInt=0x0
+01-12 18:58:32.376  7319  8018 I SDHMS:x : SIOP:: AP:305 BAT:272 USB:269 CHG:311 PA:306 BLK:0 SUBBAT:0 LRPTHM:296 SKIN:307 SKINF:304 SKINB:307 LRP:307 LRP2:307 LRF2:304 LRB2:307 AP2:307 CHG2:302 MEM2:307 WIFI2:305 RCV2:303 SPK2:280 UPSPK:302 DNSPK:272 VAP:323 AVGCUR:288 AVGSYS:0 POWER:1070
+01-12 18:58:32.674  1135  1759 D SemWifiSwitchForIndividualAppsService: isSkipNetworkCondition - result:2
+01-12 18:58:32.881   857   878 E HeatmapThread: ECT Thread time in milliseconds: 1768240712
+01-12 18:58:32.885   857   878 D HeatmapThread: !@ batteryplugType : 2
+01-12 18:58:32.886   857   878 D HeatmapThread: !@ batteryLevel : 21  batteryTemperature : 272 
+01-12 18:58:32.886   857   878 D HeatmapThread: !@ Heatmap currtime: 29470678
+01-12 18:58:32.886   857   878 D HeatmapThread: !@ Heatmap prevtime: 29470652
+01-12 18:58:32.886   857   878 D HeatmapThread: !@ Heatmap plugstarttime: 29470648
+01-12 18:58:32.886   857   878 D HeatmapThread: !@ Heatmap prevv_dsoh_update_time: 29469952
+01-12 18:58:32.887   857   878 E HeatmapThread: !@ CAM New BSOH: 100
+01-12 18:58:33.648 30657 30657 I wpa_supplicant: Heartbeat 7846
+01-12 18:58:33.700  1135  1759 D SemWifiSwitchForIndividualAppsService: isSkipNetworkCondition - result:2
+01-12 18:58:33.881   857   878 E HeatmapThread: ECT Thread time in milliseconds: 1768240713
+01-12 18:58:33.885   857   878 D HeatmapThread: !@ batteryplugType : 2
+01-12 18:58:33.885   857   878 D HeatmapThread: !@ batteryLevel : 21  batteryTemperature : 272 
+01-12 18:58:33.886   857   878 D HeatmapThread: !@ Heatmap currtime: 29470678
+01-12 18:58:33.886   857   878 D HeatmapThread: !@ Heatmap prevtime: 29470652
+01-12 18:58:33.886   857   878 D HeatmapThread: !@ Heatmap plugstarttime: 29470648
+01-12 18:58:33.886   857   878 D HeatmapThread: !@ Heatmap prevv_dsoh_update_time: 29469952
+01-12 18:58:33.886   857   878 E HeatmapThread: !@ CAM New BSOH: 100
+01-12 18:58:34.259   578   578 D io_stats: !@   8,0 r 321542074 6351494470 w 56069211 729392740 d 8423744 742494860 f 4271354 4320303 iot 132975736 0 th 0 0 0 pt 0 inp 0 0 1443231.833
+01-12 18:58:34.260   578   578 D io_stats: !@ Write_top(KB): kworker/u16:0(8492) 64 vendor.samsung.(838) 8
+01-12 18:58:34.376  1135  1637 D WifiStaIfaceHidlImpl: getCachedScanData is not implemented by HIDL
+01-12 18:58:34.385  1135  3241 D SemWifiUsabilityStatsMonitor: onWifiUsabilityStats - seqNum 206895, isSameBssidAndFreq true
+01-12 18:58:34.389  1135  1736 I SemWifiLinkQualityMonitor: Link stat: 2274 / 0 / 1,00 (12) / 144 / -67.0 || 100.0 : 144,00 / 0.5 : 1,00 / 0.55 : 0,00 / G (G) || b42b016d5220: 0,128 / 62,718 / N || N V / 0 0 / N 2.0 / N X 0 / 1443231959 0 || 2026-01-12 18:58:33  / 0: 0 0 0 0 0 0 / 1: 0 0 0 0 0 0 / 0: 0 0 0 0 0 0
+01-12 18:58:34.727  1135  1759 D SemWifiSwitchForIndividualAppsService: isSkipNetworkCondition - result:2
+01-12 18:58:34.881   857   878 E HeatmapThread: ECT Thread time in milliseconds: 1768240714
+01-12 18:58:34.883   857   878 D HeatmapThread: !@ batteryplugType : 2
+01-12 18:58:34.884   857   878 D HeatmapThread: !@ batteryLevel : 21  batteryTemperature : 272 
+01-12 18:58:34.884   857   878 D HeatmapThread: !@ Heatmap currtime: 29470678
+01-12 18:58:34.884   857   878 D HeatmapThread: !@ Heatmap prevtime: 29470652
+01-12 18:58:34.884   857   878 D HeatmapThread: !@ Heatmap plugstarttime: 29470648
+01-12 18:58:34.884   857   878 D HeatmapThread: !@ Heatmap prevv_dsoh_update_time: 29469952
+01-12 18:58:34.884   857   878 E HeatmapThread: !@ CAM New BSOH: 100

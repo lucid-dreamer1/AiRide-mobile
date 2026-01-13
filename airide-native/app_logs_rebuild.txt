@@ -1,0 +1,138 @@
+--------- beginning of main
+01-12 19:07:16.085 17603 17603 I us.airidenative: Late-enabling -Xcheck:jni
+01-12 19:07:16.139 17603 17603 I us.airidenative: Using CollectorTypeCMC GC.
+01-12 19:07:16.193 17603 17603 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+01-12 19:07:16.204 17603 17603 D ActivityThread: setConscryptValidator
+01-12 19:07:16.206 17603 17603 D ActivityThread: setConscryptValidator - put
+01-12 19:07:16.372 17603 17603 D ApplicationLoaders: Returning zygote-cached class loader: /system/framework/org.apache.http.legacy.jar
+01-12 19:07:17.091 17603 17603 D nativeloader: Configuring clns-9 for other apk /data/app/~~OhJQy7mYsOyljg2dOTo6wA==/com.anonymous.airidenative-1NsU0vykjp0P77P5Xy-eaA==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~OhJQy7mYsOyljg2dOTo6wA==/com.anonymous.airidenative-1NsU0vykjp0P77P5Xy-eaA==/lib/arm64:/data/app/~~OhJQy7mYsOyljg2dOTo6wA==/com.anonymous.airidenative-1NsU0vykjp0P77P5Xy-eaA==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/com.anonymous.airidenative
+01-12 19:07:17.102 17603 17603 V GraphicsEnvironment: Currently set values for:
+01-12 19:07:17.102 17603 17603 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+01-12 19:07:17.102 17603 17603 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+01-12 19:07:17.102 17603 17603 V GraphicsEnvironment: com.anonymous.airidenative is not listed in per-application setting
+01-12 19:07:17.102 17603 17603 V GraphicsEnvironment: ANGLE allowlist from config: 
+01-12 19:07:17.103 17603 17603 V GraphicsEnvironment: com.anonymous.airidenative is not listed in ANGLE allowlist or settings, returning default
+01-12 19:07:17.103 17603 17603 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+01-12 19:07:17.234 17603 17603 I FirebaseApp: Device unlocked: initializing all Firebase APIs for app [DEFAULT]
+01-12 19:07:17.239 17603 17603 I FirebaseInitProvider: FirebaseApp initialization successful
+01-12 19:07:17.240 17603 17603 D ReactNativeFirebaseApp: received application context.
+01-12 19:07:17.267 17603 17603 D WM-WrkMgrInitializer: Initializing WorkManager with default configuration.
+01-12 19:07:17.289 17603 17603 W SoLoader: Initializing SoLoader: 0
+01-12 19:07:17.290 17603 17603 W SoLoader: Recording new base apk path: /data/app/~~OhJQy7mYsOyljg2dOTo6wA==/com.anonymous.airidenative-1NsU0vykjp0P77P5Xy-eaA==/base.apk
+01-12 19:07:17.290 17603 17603 W SoLoader: Previously recorded 0 base apk paths.
+01-12 19:07:17.293 17603 17603 I SoLoader: Preparing SO source: DirectorySoSource[root = /vendor/lib64 flags = 2]
+01-12 19:07:17.293 17603 17603 I SoLoader: Preparing SO source: DirectorySoSource[root = /system/lib64 flags = 2]
+01-12 19:07:17.293 17603 17603 I SoLoader: Preparing SO source: ApplicationSoSource[DirectorySoSource[root = /data/app/~~OhJQy7mYsOyljg2dOTo6wA==/com.anonymous.airidenative-1NsU0vykjp0P77P5Xy-eaA==/lib/arm64 flags = 0]]
+01-12 19:07:17.295 17603 17603 I SoLoader: Preparing SO source: BackupSoSource[root = /data/data/com.anonymous.airidenative/lib-main flags = 1 apks = [/data/app/~~OhJQy7mYsOyljg2dOTo6wA==/com.anonymous.airidenative-1NsU0vykjp0P77P5Xy-eaA==/base.apk]]
+01-12 19:07:17.295 17603 17603 I SoLoader: init finish: 4 SO sources prepared
+01-12 19:07:17.295 17603 17603 W SoLoader: SoLoader initialized: 0
+01-12 19:07:17.322 17603 17801 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+01-12 19:07:17.326 17603 17603 D nativeloader: Load /data/app/~~OhJQy7mYsOyljg2dOTo6wA==/com.anonymous.airidenative-1NsU0vykjp0P77P5Xy-eaA==/lib/arm64/libreactnative.so using class loader ns clns-9 (caller=/data/app/~~OhJQy7mYsOyljg2dOTo6wA==/com.anonymous.airidenative-1NsU0vykjp0P77P5Xy-eaA==/base.apk!classes8.dex): ok
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: Entering merged library JNI_OnLoad.
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: Preparing 12 pre-merged libs (including stub)
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: Preparing to register libfabricjni_so.  onload_func: 0x7c22878ce0
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: Preparing to register libreact_devsupportjni_so.  onload_func: 0x7c22a72fc8
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: Preparing to register libreact_featureflagsjni_so.  onload_func: 0x7c22a81518
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: Preparing to register libreact_newarchdefaults_so.  onload_func: 0x7c22ae96a8
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: Preparing to register libreactnativeblob_so.  onload_func: 0x7c22cd9cb4
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: Preparing to register libreactnativejni_so.  onload_func: 0x7c22d276bc
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: Preparing to register libreactnativejni_common_so.  onload_func: 0x7c22d38044
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: Preparing to register librninstance_so.  onload_func: 0x7c22d7f764
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: Preparing to register libturbomodulejsijni_so.  onload_func: 0x7c22e97f68
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: Preparing to register libuimanagerjni_so.  onload_func: 0x7c22eb0fb8
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: Preparing to register libyoga_so.  onload_func: 0x7c22ec0a3c
+01-12 19:07:17.326 17603 17603 D jni_lib_merge: About to register 11 actual methods.
+01-12 19:07:17.341 17603 17603 D nativeloader: Load /data/app/~~OhJQy7mYsOyljg2dOTo6wA==/com.anonymous.airidenative-1NsU0vykjp0P77P5Xy-eaA==/lib/arm64/libappmodules.so using class loader ns clns-9 (caller=/data/app/~~OhJQy7mYsOyljg2dOTo6wA==/com.anonymous.airidenative-1NsU0vykjp0P77P5Xy-eaA==/base.apk!classes8.dex): ok
+01-12 19:07:17.368 17603 17603 D nativeloader: Load /data/app/~~OhJQy7mYsOyljg2dOTo6wA==/com.anonymous.airidenative-1NsU0vykjp0P77P5Xy-eaA==/lib/arm64/libfbjni.so using class loader ns clns-9 (caller=/data/app/~~OhJQy7mYsOyljg2dOTo6wA==/com.anonymous.airidenative-1NsU0vykjp0P77P5Xy-eaA==/base.apk!classes8.dex): ok
+01-12 19:07:17.454 17603 17603 D SensorManager: registerListener :: 16777217, ICM42632M Accelerometer, 66667, 0, 
+--------- beginning of system
+01-12 19:07:17.651 17603 17603 D ActivityThread: com.anonymous.airidenative will use render engine as VK
+01-12 19:07:17.651 17603 17603 D HWUI    : HWUI - treat SMPTE_170M as sRGB
+01-12 19:07:17.703 17603 17869 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+01-12 19:07:17.728 17603 17869 D HWUI    : CacheManager constructor. deviceInfo=(1080, 1920)
+01-12 19:07:17.916 17603 17603 D AppCompatDelegate: Checking for metadata for AppLocalesMetadataHolderService : Service not found
+01-12 19:07:17.971 17603 17603 D CompatChangeReporter: Compat change id reported: 377864165; UID 10461; state: ENABLED
+01-12 19:07:17.975 17603 17603 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+01-12 19:07:17.985 17603 17603 I DecorView: setWindowBackground: isPopOver=false color=ff303030 d=android.graphics.drawable.ColorDrawable@c0eea2e
+01-12 19:07:18.018 17603 17603 I us.airidenative: hiddenapi: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app) using reflection: allowed
+01-12 19:07:18.064 17603 17603 I us.airidenative: hiddenapi: Accessing hidden field Ljava/lang/reflect/Field;->accessFlags:I (runtime_flags=0, domain=core-platform, api=unsupported) from Lexpo/modules/ReactActivityDelegateWrapper; (domain=app) using reflection: allowed
+01-12 19:07:18.069 17603 17603 I ExpoDevMenu: Set new dev-menu delegate: class expo.modules.devmenu.DevMenuDefaultDelegate
+01-12 19:07:18.092 17603 17603 W WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+01-12 19:07:18.092 17603 17603 W WindowOnBackDispatcher: Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+01-12 19:07:18.168 17603 17603 I ViewRootImpl: dVRR is disabled
+01-12 19:07:18.171 17603 17603 D HardwareRenderer: onDisplayChanged. displayId=0 current wxh=1080x2340 mLargest wxh=0x0
+01-12 19:07:18.171 17603 17603 D HardwareRenderer: Set largestWidth and largestHeight as logical resolution. (1080x2340)
+01-12 19:07:18.171 17603 17869 D HWUI    : setMaxSurfaceArea requested wxh=(1080,2340) requestedSurfaceArea(2527200) mMaxSurfaceArea(2073600)
+01-12 19:07:18.174 17603 17869 D NativeCustomFrequencyManager: [NativeCFMS] BpCustomFrequencyManager::BpCustomFrequencyManager()
+01-12 19:07:18.188 17603 17603 D InputTransport: Input channel constructed: 'dce06ca', fd=126
+01-12 19:07:18.196 17603 17603 I InsetsController: onStateChanged: host=com.anonymous.airidenative/com.anonymous.airidenative.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1080, 2340), mDisplayCutout=DisplayCutout{insets=Rect(0, 89 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(507, 0 - 573, 89), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2340 physicalDisplayWidth=1080 physicalDisplayHeight=2340 density={2.8125} cutoutSpec={M 0,0 M 0,8.177777777777778 a 11.73333333333333,11.73333333333333 0 1,0 0,23.46666666666667 a 11.73333333333333,11.73333333333333 0 1,0 0,-23.46666666666667 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=113, center=Point(113, 113)}, RoundedCorner{position=TopRight, radius=113, center=Point(967, 113)}, RoundedCorner{position=BottomRight, radius=113, center=Point(967, 2227)}, RoundedCorner{position=BottomLeft, radius=113, center=Point(113, 2227)}]}  mRoundedCornerFrame=Rect(0, 0 - 1080, 2340), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(956, 0 - 1080, 91) rotation=0}, mDisplayShape=DisplayShape{ spec=-392560863 displayWidth=1080 displayHeight=2340 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1080,89] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {10590001 mType=navigationBars mFrame=[0,2205][1080,2340] mVisible=false mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {10590004 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {10590005 mType=mandatorySystemGestures mFrame=[0,2205][1080,2340] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {10590006 mType=tappableElement mFrame=[0,2205][1080,2340] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {10590024 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {1b8e0000 mType=statusBars mFrame=[0,0][1080,91] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {1b8e0005 mType=mandatorySystemGestures mFrame=[0,0][1080,123] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {1b8e0006 mType=tappableElement mFrame=[0,0][1080,91] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null} }
+01-12 19:07:18.200 17603 17603 I VRI[MainActivity]@9de7baf: synced displayState. AttachInfo displayState=4
+01-12 19:07:18.206 17603 17603 I VRI[MainActivity]@9de7baf: setView = com.android.internal.policy.DecorView@5a123cb IsHRR=false mFlingFrameRateChange=0 TM=true
+01-12 19:07:18.207 17603 17603 I IDS_TAG : Clearing training data of com.anonymous.airidenative.MainApplication@9d7fb55
+01-12 19:07:18.209 17603 17603 I IDS_TAG : Starting IDS observe window
+01-12 19:07:18.210 17603 17603 I IDS_TAG : Getting Shared Preference for com.anonymous.airidenative.MainApplication@9d7fb55 uid = 10461
+01-12 19:07:18.211 17603 17603 I IDS_TAG : App com.anonymous.airidenative.MainApplication@9d7fb55 has not finished training
+01-12 19:07:18.219 17603 17603 I VRI[MainActivity]@9de7baf: stopped(true) old = false
+01-12 19:07:18.219 17603 17603 D VRI[MainActivity]@9de7baf: WindowStopped on com.anonymous.airidenative/com.anonymous.airidenative.MainActivity set to true
+01-12 19:07:18.219 17603 17869 D HWUI    : CacheManager::trimMemory(20)
+01-12 19:07:18.228 17603 17603 I IDS_TAG : Closing IDS observe window
+01-12 19:07:18.228 17603 17603 I IDS_TAG : Getting Shared Preference for com.anonymous.airidenative.MainApplication@9d7fb55 uid = 10461
+01-12 19:07:18.234 17603 17603 I IDS_TAG : IDS count updated to 1 for com.anonymous.airidenative.MainApplication@9d7fb55
+01-12 19:07:18.266 17603 17603 I VRI[MainActivity]@9de7baf: Relayout returned: old=(0,0,1080,2340) new=(0,0,1080,2340) relayoutAsync=false req=(0,0)4 dur=10 res=0x0 s={false 0x0} ch=false seqId=0
+01-12 19:07:18.266 17603 17603 D VRI[MainActivity]@9de7baf: Not drawing due to not visible. Reason=View.INVISIBLE
+01-12 19:07:18.269 17603 17869 D HWUI    : CacheManager::trimMemory(20)
+01-12 19:07:18.276 17603 17603 I TaskService: Handling intent with action 'android.intent.action.MY_PACKAGE_REPLACED'.
+01-12 19:07:18.278 17603 17869 D HWUI    : HWUI - treat SMPTE_170M as sRGB
+01-12 19:07:18.280 17603 17603 I VRI[MainActivity]@9de7baf: handleAppVisibility mAppVisible = true visible = false
+01-12 19:07:20.471 17603 17603 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda16@2cc3654
+01-12 19:07:20.473 17603 17869 D HWUI    : CacheManager::trimMemory(20)
+01-12 19:07:20.473 17603 17603 I VRI[MainActivity]@9de7baf: dispatchDetachedFromWindow
+01-12 19:07:20.477 17603 17603 D InputTransport: Input channel destroyed: 'dce06ca', fd=126
+01-12 19:07:20.479 17603 17603 D ActivityThread: com.anonymous.airidenative will use render engine as VK
+01-12 19:07:20.492 17603 17603 I DecorView: setWindowBackground: isPopOver=false color=fff8f8fa d=android.graphics.drawable.ColorDrawable@19ac652
+01-12 19:07:20.500 17603 17603 W WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+01-12 19:07:20.500 17603 17603 W WindowOnBackDispatcher: Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+01-12 19:07:20.503 17603 17603 I ViewRootImpl: dVRR is disabled
+01-12 19:07:20.504 17603 17869 D NativeCustomFrequencyManager: [NativeCFMS] BpCustomFrequencyManager::BpCustomFrequencyManager()
+01-12 19:07:20.507 17603 17603 D InputTransport: Input channel constructed: 'bedb0c0', fd=126
+01-12 19:07:20.508 17603 17603 I InsetsController: onStateChanged: host=com.anonymous.airidenative/expo.modules.devlauncher.launcher.errors.DevLauncherErrorActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1080, 2340), mDisplayCutout=DisplayCutout{insets=Rect(0, 89 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(507, 0 - 573, 89), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2340 physicalDisplayWidth=1080 physicalDisplayHeight=2340 density={2.8125} cutoutSpec={M 0,0 M 0,8.177777777777778 a 11.73333333333333,11.73333333333333 0 1,0 0,23.46666666666667 a 11.73333333333333,11.73333333333333 0 1,0 0,-23.46666666666667 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=113, center=Point(113, 113)}, RoundedCorner{position=TopRight, radius=113, center=Point(967, 113)}, RoundedCorner{position=BottomRight, radius=113, center=Point(967, 2227)}, RoundedCorner{position=BottomLeft, radius=113, center=Point(113, 2227)}]}  mRoundedCornerFrame=Rect(0, 0 - 1080, 2340), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(956, 0 - 1080, 91) rotation=0}, mDisplayShape=DisplayShape{ spec=-392560863 displayWidth=1080 displayHeight=2340 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1080,89] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {10590001 mType=navigationBars mFrame=[0,2205][1080,2340] mVisible=false mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {10590004 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {10590005 mType=mandatorySystemGestures mFrame=[0,2205][1080,2340] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {10590006 mType=tappableElement mFrame=[0,2205][1080,2340] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {10590024 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {1b8e0000 mType=statusBars mFrame=[0,0][1080,91] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {1b8e0005 mType=mandatorySystemGestures mFrame=[0,0][1080,123] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {1b8e0006 mType=tappableElement mFrame=[0,0][1080,91] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null} }
+01-12 19:07:20.509 17603 17603 I VRI[DevLauncherErrorActivity]@78b538: synced displayState. AttachInfo displayState=4
+01-12 19:07:20.509 17603 17603 I VRI[DevLauncherErrorActivity]@78b538: setView = com.android.internal.policy.DecorView@dc96877 IsHRR=false mFlingFrameRateChange=0 TM=true
+01-12 19:07:20.512 17603 17869 D HWUI    : HWUI - treat SMPTE_170M as sRGB
+01-12 19:07:20.529 17603 17627 I us.airidenative: Compiler allocated 5101KB to compile void android.view.ViewRootImpl.performTraversals()
+01-12 19:07:20.642 17603 17603 I us.airidenative: hiddenapi: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/compose/ui/platform/AndroidComposeView$Companion; (domain=app) using reflection: allowed
+01-12 19:07:20.804 17603 17603 I BLASTBufferQueue_Java: new BLASTBufferQueue, mName= VRI[DevLauncherErrorActivity]@78b538 mNativeObject= 0xb400007db571f7c0 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3585 android.view.ViewRootImpl.relayoutWindow:11685 android.view.ViewRootImpl.performTraversals:4804 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 android.view.Choreographer$CallbackRecord.run:1910 android.view.Choreographer.doCallbacks:1367 android.view.Choreographer.doFrame:1292 android.view.Choreographer$FrameDisplayEventReceiver.run:1870 
+01-12 19:07:20.804 17603 17603 I BLASTBufferQueue_Java: update, w= 1080 h= 2340 mName = VRI[DevLauncherErrorActivity]@78b538 mNativeObject= 0xb400007db571f7c0 sc.mNativeObject= 0xb400007d456a7290 format= -1 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3590 android.view.ViewRootImpl.relayoutWindow:11685 android.view.ViewRootImpl.performTraversals:4804 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 
+01-12 19:07:20.806 17603 17603 I VRI[DevLauncherErrorActivity]@78b538: Relayout returned: old=(0,0,1080,2340) new=(0,0,1080,2340) relayoutAsync=false req=(1080,2340)0 dur=5 res=0x3 s={true 0xb400007e757045f0} ch=true seqId=0
+01-12 19:07:20.807 17603 17603 D VRI[DevLauncherErrorActivity]@78b538: mThreadedRenderer.initialize() mSurface={isValid=true 0xb400007e757045f0} hwInitialized=true
+01-12 19:07:20.849 17603 17603 D VRI[DevLauncherErrorActivity]@78b538: reportNextDraw android.view.ViewRootImpl.performTraversals:5443 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 android.view.Choreographer$CallbackRecord.run:1910 
+01-12 19:07:20.849 17603 17603 D VRI[DevLauncherErrorActivity]@78b538: Setup new sync=wmsSync-VRI[DevLauncherErrorActivity]@78b538#0
+01-12 19:07:20.850 17603 17603 I VRI[DevLauncherErrorActivity]@78b538: Creating new active sync group VRI[DevLauncherErrorActivity]@78b538#1
+01-12 19:07:20.852 17603 17603 D VRI[DevLauncherErrorActivity]@78b538: registerCallbacksForSync syncBuffer=false
+01-12 19:07:20.873 17603 17603 I View    : setRequestedFrameRate frameRate=0.0, this=androidx.compose.ui.platform.AndroidComposeView{7372f98 VFED..... ........ 0,0-1080,2340 aid=1073741824}, caller=android.view.ViewGroup.setRequestedFrameRate:9952 androidx.compose.ui.platform.Api35Impl.setRequestedFrameRate:3314 androidx.compose.ui.platform.AndroidComposeView.dispatchDraw:1949 android.view.View.draw:26345 android.view.View.updateDisplayListIfDirty:25175 
+01-12 19:07:20.874 17603 17603 I View    : setRequestedFrameRate frameRate=-4.0, this=android.view.View{82d4955 V.ED..... ......I. 0,0-0,0}, caller=androidx.compose.ui.platform.Api35Impl.setRequestedFrameRate:3314 androidx.compose.ui.platform.AndroidComposeView.dispatchDraw:1950 android.view.View.draw:26345 android.view.View.updateDisplayListIfDirty:25175 android.view.View.draw:26072 
+01-12 19:07:20.876 17603 17955 D VRI[DevLauncherErrorActivity]@78b538: Received frameDrawingCallback syncResult=0 frameNum=1.
+01-12 19:07:20.876 17603 17955 I VRI[DevLauncherErrorActivity]@78b538: mWNT: t=0xb400007e256cdd10 mBlastBufferQueue=0xb400007db571f7c0 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$12.onFrameDraw:15441 android.view.ThreadedRenderer$1.onFrameDraw:718 <bottom of call stack> 
+01-12 19:07:20.876 17603 17955 I VRI[DevLauncherErrorActivity]@78b538: Setting up sync and frameCommitCallback
+01-12 19:07:21.105 17603 17869 I BLASTBufferQueue: [VRI[DevLauncherErrorActivity]@78b538#0](f:0,a:0,s:0) onFrameAvailable the first frame is available
+01-12 19:07:21.107 17603 17869 I VRI[DevLauncherErrorActivity]@78b538: Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true
+01-12 19:07:21.109 17603 17869 D HWUI    : CFMS:: SetUp Pid : 17603    Tid : 17869
+01-12 19:07:21.109 17603 17603 D VRI[DevLauncherErrorActivity]@78b538: reportDrawFinished seqId=0
+01-12 19:07:21.112 17603 17603 I Choreographer: Skipped 68 frames!  The application may be doing too much work on its main thread.
+01-12 19:07:21.114 17603 17869 D HWUI    : CacheManager::trimMemory(20)
+01-12 19:07:21.121 17603 17603 I VRI[DevLauncherErrorActivity]@78b538: stopped(true) old = false
+01-12 19:07:21.121 17603 17603 D VRI[DevLauncherErrorActivity]@78b538: WindowStopped on com.anonymous.airidenative/expo.modules.devlauncher.launcher.errors.DevLauncherErrorActivity set to true
+01-12 19:07:21.121 17603 17869 D HWUI    : CacheManager::trimMemory(20)
+01-12 19:07:21.144 17603 17869 D HWUI    : CacheManager::trimMemory(20)
+01-12 19:07:21.149 17603 17603 I VRI[DevLauncherErrorActivity]@78b538: Relayout returned: old=(0,0,1080,2340) new=(0,0,1080,2340) relayoutAsync=false req=(1080,2340)4 dur=4 res=0x2 s={false 0x0} ch=false seqId=0
+01-12 19:07:21.149 17603 17603 D VRI[DevLauncherErrorActivity]@78b538: Not drawing due to not visible. Reason=View.INVISIBLE
+01-12 19:07:21.151 17603 17603 I VRI[DevLauncherErrorActivity]@78b538: handleAppVisibility mAppVisible = true visible = false
+01-12 19:07:23.684 17603 17999 D ProfileInstaller: Installing profile for com.anonymous.airidenative
+01-12 19:07:42.300 17603 17628 I us.airidenative: Background concurrent mark compact GC freed 7672KB AllocSpace bytes, 11(276KB) LOS objects, 49% free, 7509KB/14MB, paused 458us,6.310ms total 110.403ms
+01-12 19:07:42.301 17603 17869 D HWUI    : CacheManager::trimMemory(20)
+01-12 19:07:42.302 17603 17869 D HWUI    : CacheManager::trimMemory(20)
+01-12 19:07:42.306 17603 17630 W System  : A resource failed to call release. 
+01-12 19:08:00.540 17603 17603 I VRI[DevLauncherErrorActivity]@78b538: onDisplayChanged oldDisplayState=4 newDisplayState=3
+01-12 19:08:00.624 17603 17603 I VRI[DevLauncherErrorActivity]@78b538: onDisplayChanged oldDisplayState=3 newDisplayState=4
+01-12 19:08:05.776 17603 17603 I VRI[DevLauncherErrorActivity]@78b538: onDisplayChanged oldDisplayState=4 newDisplayState=3
+01-12 19:08:11.306 17603 17603 I VRI[DevLauncherErrorActivity]@78b538: onDisplayChanged oldDisplayState=3 newDisplayState=4

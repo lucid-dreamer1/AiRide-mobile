@@ -33,9 +33,10 @@ import { useNavigationContext } from "@/navigation/NavigationContext";
 import { useHelmet } from "@/contexts/HelmetContext";
 import useNavigationUpdater from "@/hooks/useNavigationUpdater";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
+import { useVoiceCommand } from "@/hooks/useVoiceCommand";
 import { useVoiceSettings } from "@/contexts/VoiceSettingsContext";
 
-const DEMO_MODE = false;
+const DEMO_MODE = true;
 
 type Point = { latitude: number; longitude: number };
 
@@ -394,11 +395,41 @@ export default function HomeScreen() {
 
   useNavigationUpdater(currentInstruction, setCurrentInstruction);
 
-  // Voice Assistant - sincronizzato con le istruzioni di navigazione
+  // 1. Assistente Vocale Navigation (TTS)
   useVoiceAssistant({
     instruction: currentInstruction,
     enabled: voiceSettings.enabled && (isNavigating || demoCanStart),
     settings: voiceSettings,
+  });
+  
+  // 2. Assistente Vocale Hands-free (Hey Casco - STT)
+  useVoiceCommand({
+    enabled: voiceSettings.enabled,
+    accessKey: '+0aml9jO2BKifVdFTCZgD93zHnZoP6ZaCBWEdYGWp8rD5TNRCBVZNQ==',
+    keywordPath: 'Hey-Casco_it_android_v4_0_0.ppn',
+    porcupineModelPath: 'porcupine_params_it.pv', // Necessario per keyword in Italiano
+    onIntentDetected: (intent) => {
+      console.log('[HomeScreen] Intento vocale rilevato:', intent);
+      
+      switch (intent.type) {
+        case 'NAVIGATE_TO':
+          setDestination(intent.destination);
+          fetchRoute(intent.destination);
+          break;
+        case 'CANCEL_NAVIGATION':
+          handleResetRoute();
+          break;
+        case 'RECALCULATE_ROUTE':
+          fetchRoute();
+          break;
+        case 'CHANGE_ROUTE':
+          if (intent.avoid?.includes('highways')) {
+            Toast.show({ type: 'info', text1: 'Ricalcolo: evita autostrade' });
+            fetchRoute();
+          }
+          break;
+      }
+    },
   });
 
   // -------------------------------------------------------------

@@ -15,7 +15,7 @@ import base64 from "react-native-base64";
 const manager = new BleManager();
 
 // 🟦 ATTIVA/DISATTIVA MOCK
-const MOCK_BLE = false;
+const MOCK_BLE = true;
 
 type HelmetContextType = {
   device: Device | null;
