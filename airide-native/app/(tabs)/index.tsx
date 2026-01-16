@@ -403,11 +403,8 @@ export default function HomeScreen() {
   });
   
   // 2. Assistente Vocale Hands-free (Hey Casco - STT)
-  useVoiceCommand({
+  const { isListening, debugStatus } = useVoiceCommand({
     enabled: voiceSettings.enabled,
-    accessKey: '+0aml9jO2BKifVdFTCZgD93zHnZoP6ZaCBWEdYGWp8rD5TNRCBVZNQ==',
-    keywordPath: 'Hey-Casco_it_android_v4_0_0.ppn',
-    porcupineModelPath: 'porcupine_params_it.pv', // Necessario per keyword in Italiano
     onIntentDetected: (intent) => {
       console.log('[HomeScreen] Intento vocale rilevato:', intent);
       
@@ -644,6 +641,21 @@ export default function HomeScreen() {
         <Feather name="send" size={20} color="white" />
         <Text style={styles.sendButtonText}>Invia al casco</Text>
       </TouchableOpacity>
+      <View style={{
+        position: 'absolute',
+        top: 60,
+        right: 20,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        padding: 10,
+        borderRadius: 10,
+        maxWidth: 200,
+        zIndex: 9999
+      }}>
+        <Text style={{color: 'white', fontSize: 10, fontFamily: 'monospace'}}>
+          DEBUG VOICE:
+          {'\n' + debugStatus}
+        </Text>
+      </View>
     </View>
   );
 }

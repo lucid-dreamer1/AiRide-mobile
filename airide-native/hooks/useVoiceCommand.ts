@@ -1,186 +1,208 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { NativeModules, NativeEventEmitter } from 'react-native';
-import { PorcupineManager } from '@picovoice/porcupine-react-native';
+import { Platform, PermissionsAndroid, Linking, Alert } from 'react-native';
+import * as Vosk from 'react-native-vosk';
 import { IntentParser, VoiceIntent } from '../utils/IntentParser';
 
-const { VoskModule } = NativeModules;
-const voskEmitter = new NativeEventEmitter(VoskModule);
 
 interface UseVoiceCommandProps {
   enabled: boolean;
-  accessKey?: string;
-  keywordPath?: string;
-  porcupineModelPath?: string;
-  modelPath?: string;
   onIntentDetected: (intent: VoiceIntent) => void;
 }
 
-/**
- * Hook per l'ascolto continuo della wake word e riconoscimento comandi (Hands-free)
- */
+type VoiceMode = 'WAKE_WORD' | 'COMMAND';
+
 export function useVoiceCommand({
   enabled,
-  accessKey = '+0aml9jO2BKifVdFTCZgD93zHnZoP6ZaCBWEdYGWp8rD5TNRCBVZNQ==',
-  keywordPath = 'Hey-Casco_it_android_v4_0_0.ppn',
-  porcupineModelPath,
-  modelPath = 'model',
   onIntentDetected,
 }: UseVoiceCommandProps) {
   const [isListening, setIsListening] = useState(false);
-  const porcupineManager = useRef<PorcupineManager | null>(null);
+  const [debugStatus, setDebugStatus] = useState<string>('Inizializzazione...');
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [mode, setMode] = useState<VoiceMode>('WAKE_WORD');
+
   const intentParser = useRef(new IntentParser());
-  const isModelReadyRef = useRef(false);
-  const isVoskActiveRef = useRef(false);
+  const isModelReady = useRef(false);
+  const currentMode = useRef<VoiceMode>('WAKE_WORD');
   const onIntentDetectedRef = useRef(onIntentDetected);
 
-  // Mantieni aggiornata la ref del callback
+  // Wake Word Grammar - Restricted for accuracy. Removed single "casco" to avoid false positives.
+  const WAKE_GRAMMAR = ["hey casco", "ehi casco", "[unk]"];
+
   useEffect(() => {
     onIntentDetectedRef.current = onIntentDetected;
   }, [onIntentDetected]);
 
-  const startVosk = useCallback(async () => {
-    if (!isModelReadyRef.current) {
-      console.warn('[VoiceCommand] Impossibile avviare STT: Modello non pronto');
-      return;
-    }
-    if (isVoskActiveRef.current) {
-      console.log('[VoiceCommand] Vosk già attivo, skip');
-      return;
-    }
-    try {
-      console.log('[VoiceCommand] Avvio Vosk STT...');
-      isVoskActiveRef.current = true;
-      await VoskModule.startListening();
-      setIsListening(true);
-    } catch (e) {
-      console.error('[VoiceCommand] Errore avvio Vosk:', e);
-      isVoskActiveRef.current = false;
-    }
-  }, []);
+  const updateStatus = (msg: string) => {
+    console.log(msg);
+    setDebugStatus(prev => msg + '\n' + prev.split('\n').slice(0, 4).join('\n'));
+  };
 
-  const stopVosk = useCallback(() => {
-    if (!isVoskActiveRef.current) return;
-    console.log('[VoiceCommand] Stop Vosk STT');
-    VoskModule.stopListening();
-    isVoskActiveRef.current = false;
-    setIsListening(false);
-  }, []);
+  const updateError = (err: string) => {
+    console.error(err);
+    setLastError(err);
+    setDebugStatus(prev => `ERROR: ${err}\n` + prev);
+  };
 
-  const restartPorcupine = useCallback(async () => {
-    try {
-      console.log('[VoiceCommand] Riavvio Porcupine...');
-      await porcupineManager.current?.start();
-    } catch (e) {
-      console.error('[VoiceCommand] Errore riavvio Porcupine:', e);
-    }
-  }, []);
-
-  // Inizializza Vosk Model una sola volta
-  useEffect(() => {
-    const init = async () => {
+  const requestPermissions = async () => {
+    if (Platform.OS === 'android') {
       try {
-        console.log('[VoiceCommand] Inizializzazione Vosk Model...');
-        await VoskModule.initModel(modelPath);
-        console.log('[VoiceCommand] Vosk Model pronto!');
-        isModelReadyRef.current = true;
-      } catch (e) {
-        console.error('[VoiceCommand] Errore Vosk Init:', e);
-      }
-    };
-    init();
-  }, [modelPath]);
-
-  // Inizializza Porcupine una sola volta
-  useEffect(() => {
-    const initPorcupine = async () => {
-      // Aspetta che il modello sia pronto
-      await new Promise<void>((resolve) => {
-        const check = () => {
-          if (isModelReadyRef.current) {
-            resolve();
-          } else {
-            setTimeout(check, 100);
-          }
-        };
-        check();
-      });
-
-      if (porcupineManager.current) return;
-
-      try {
-        console.log('[VoiceCommand] Inizializzazione Porcupine...');
-        porcupineManager.current = await PorcupineManager.fromKeywordPaths(
-          accessKey,
-          [keywordPath],
-          async (keywordIndex) => {
-            if (keywordIndex === 0) {
-              console.log('[VoiceCommand] Wake word rilevata!');
-              await porcupineManager.current?.stop();
-              await startVosk();
-            }
-          },
-          undefined,
-          porcupineModelPath
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
         );
-
-        if (enabled) {
-          await porcupineManager.current.start();
+        console.log('[VoiceCommand] Permission result:', granted);
+        
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          return true;
+        } else if (granted === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+          updateError('Permesso microfono negato permanentemente. Vai nelle impostazioni.');
+          Alert.alert(
+             "Permesso Microfono Necessario",
+             "Per usare i comandi vocali devi abilitare il microfono dalle impostazioni.",
+             [
+               { text: "Annulla", style: "cancel" },
+               { text: "Apri Impostazioni", onPress: () => Linking.openSettings() }
+             ]
+          );
+          return false;
+        } else {
+          updateError('Permesso microfono rifiutato.');
+          return false;
         }
-      } catch (e) {
-        console.error('[VoiceCommand] Errore Porcupine:', e);
-      }
-    };
-
-    initPorcupine();
-
-    return () => {
-      porcupineManager.current?.delete();
-      porcupineManager.current = null;
-    };
-  }, [accessKey, keywordPath, porcupineModelPath, enabled, startVosk]);
-
-  // Listener per i risultati Vosk - separato per evitare re-render
-  useEffect(() => {
-    const resultSub = voskEmitter.addListener('onVoskResult', (resultJson: string) => {
-      console.log('[VoiceCommand] Vosk Result ricevuto:', resultJson);
-      try {
-        const result = JSON.parse(resultJson);
-        const text = result.text || '';
-        if (text) {
-          const intent = intentParser.current.parse(text);
-          onIntentDetectedRef.current(intent);
-        }
-      } catch (e) {
-        console.error('[VoiceCommand] Errore Vosk Result:', e);
-      }
-      // Stop Vosk e riavvia Porcupine
-      stopVosk();
-      restartPorcupine();
-    });
-
-    const errorSub = voskEmitter.addListener('onVoskError', (error: string) => {
-      console.error('[VoiceCommand] Vosk Error:', error);
-      stopVosk();
-      restartPorcupine();
-    });
-
-    return () => {
-      resultSub.remove();
-      errorSub.remove();
-    };
-  }, [stopVosk, restartPorcupine]);
-
-  // Gestisci enabled/disabled
-  useEffect(() => {
-    if (porcupineManager.current) {
-      if (enabled && !isVoskActiveRef.current) {
-        porcupineManager.current.start();
-      } else if (!enabled) {
-        porcupineManager.current.stop();
-        stopVosk();
+      } catch (err: any) {
+        updateError(`Errore richiesta permessi: ${err.message}`);
+        return false;
       }
     }
-  }, [enabled, stopVosk]);
+    return true;
+  };
 
-  return { isListening };
+
+  const startVosk = useCallback(async (targetMode: VoiceMode) => {
+    try {
+      if (!isModelReady.current) {
+        updateStatus('Attendo caricamento modello...');
+        return;
+      }
+
+      currentMode.current = targetMode;
+      setMode(targetMode);
+
+      Vosk.stop(); // Stop any previous instance
+
+      if (targetMode === 'WAKE_WORD') {
+        // WAKE_GRAMMAR is expected to be string[], but the variable I defined was JSON.stringify().
+        // Let's redefine WAKE_GRAMMAR as just array of strings in the const definition, or parse it here.
+        // Checking the definition above... `const WAKE_GRAMMAR = JSON.stringify(...)` 
+        // I should change the const definition instead. But here I will just replace the call to be correct.
+        
+        // Actually, better to change the specific line where I called it. 
+        // Wait, I should change the Definition of WAKE_GRAMMAR too if I want it clean.
+        // But for this tool call, let's just change the startVosk function logic slightly or the grammar definition.
+        
+        // Let's change the definition of WAKE_GRAMMAR first to be an array, then here pass { grammar: WAKE_GRAMMAR }
+        
+        Vosk.start({ grammar: WAKE_GRAMMAR });
+
+      } else {
+        updateStatus('Ascolto comando...');
+        Vosk.start(); // No grammar = Full Speech to Text
+        setIsListening(true);
+      }
+    } catch (e: any) {
+      updateError(`Errore start Vosk (${targetMode}): ${e.message}`);
+    }
+  }, []);
+
+  const handleResult = useCallback((text: string) => {
+    const cleanText = text.toLowerCase().trim();
+    if (!cleanText) return;
+
+    updateStatus(`Vosk [${currentMode.current}]: ${cleanText}`);
+
+    if (currentMode.current === 'WAKE_WORD') {
+      if (cleanText.includes('hey casco') || cleanText.includes('ehi casco')) {
+        updateStatus('🔥 WAKE WORD RILEVATA! 🔥');
+        startVosk('COMMAND');
+      }
+    } else {
+      // COMMAND MODE
+      const intent = intentParser.current.parse(cleanText);
+      
+      // If valid intent found OR if we want to confirm ANY text
+      // Check if it's UNKNOWN or actual command
+      if (intent.type !== 'UNKNOWN') {
+        updateStatus(`Comando riconosciuto: ${intent.type}`);
+        onIntentDetectedRef.current(intent);
+        
+        // Return to Wake Word mode after successful command
+        startVosk('WAKE_WORD');
+      } else {
+        // If unknown, maybe wait for more? Or reset?
+        // For now, let's treat it as a failed command and reset, or log it
+         updateStatus(`Comando non capito: ${cleanText}`);
+         // Optional: Keep listening until timeout or valid command? 
+         // Let's reset to Wake Word to avoid stuck loop
+         startVosk('WAKE_WORD');
+      }
+    }
+  }, [startVosk]);
+
+  // Initialization
+  useEffect(() => {
+    let resultSub: any;
+    let errorSub: any;
+
+    const init = async () => {
+      const hasPerm = await requestPermissions();
+      if (!hasPerm) {
+        updateError('Permesso microfono negato');
+        return;
+      }
+
+      try {
+        updateStatus('Caricamento modello Vosk (model-it)...');
+        await Vosk.loadModel('model-it');
+        isModelReady.current = true;
+        updateStatus('Modello caricato.');
+        
+        if (enabled) {
+          startVosk('WAKE_WORD');
+        }
+      } catch (e: any) {
+        updateError(`Errore caricamento modello: ${e.message}`);
+      }
+    };
+
+    resultSub = Vosk.onResult((text: string) => {
+       handleResult(text);
+    });
+
+    errorSub = Vosk.onError((e: any) => {
+      updateError(`Vosk Error: ${e}`);
+      // Try to restart if error occurs?
+      // startVosk(currentMode.current);
+    });
+
+    init();
+
+    return () => {
+      if (resultSub) resultSub.remove();
+      if (errorSub) errorSub.remove();
+      Vosk.stop();
+    };
+  }, []); // Run once on mount
+
+  // Watch 'enabled' prop
+  useEffect(() => {
+    if (isModelReady.current) {
+      if (enabled) {
+        startVosk('WAKE_WORD');
+      } else {
+        Vosk.stop();
+        updateStatus('Vosk disabilitato');
+      }
+    }
+  }, [enabled, startVosk]);
+
+  return { isListening, debugStatus, lastError };
 }
