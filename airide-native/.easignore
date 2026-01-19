@@ -1,0 +1,13 @@
+# Do NOT ignore android/ - we need it with forced AGP/Gradle versions
+# Only ignore build artifacts
+android/build/
+android/app/build/
+android/.gradle/
+android/.cxx/
+
+# Ignore iOS for Android builds
+ios/
+
+# General ignores
+.git/
+node_modules/.cache/

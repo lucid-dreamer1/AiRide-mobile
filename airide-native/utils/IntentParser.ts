@@ -13,7 +13,9 @@ export type VoiceIntent =
  * Modulo per il parsing dei comandi vocali in intent strutturati.
  */
 export class IntentParser {
-  private navRegex = /portami a (.*)/i;
+  // Regex più flessibile per gestire errori di trascrizione comuni di Vosk (es. "porta mi", "porta via", "porta mi ha", "porta mia")
+  // La preposizione è ora opzionale (?:\s+via...)? per gestire casi come "porta mia caserta" in cui la 'a' è assorbita.
+  private navRegex = /(?:portami|porta\s+mi|porta\s+via|porta\s+mia|portano|vai|andiamo)(?:\s+(?:a|ad|in|verso|da|ha))?\s+(.*)/i;
   private changeRegex = /cambia percorso/i;
   private avoidHighwaysRegex = /evita autostrade/i;
   private cancelRegex = /(annulla|elimina|cancella|termina|stop)\s+(la\s+)?(navigazione|rotta|rutta|percorso|viaggio)/i;
@@ -21,6 +23,7 @@ export class IntentParser {
   private wakeWordRegex = /\b(hey|ehi|ei|e il|il|a il|al|ok)\s+casco/i;
 
   /**
+<<<<<<< HEAD
    * Normalizza l'indirizzo dal formato parlato al formato "indirizzo, città"
    * Esempio: "san prisco in via circumvallazione 65" -> "via circumvallazione 65, san prisco"
    * Esempio: "caserta via roma 13" -> "via roma 13, caserta"
@@ -37,10 +40,49 @@ export class IntentParser {
       const streetAddress = match[3].trim();
       // Ricostruisci: "via roma 13, caserta"
       return `${streetType} ${streetAddress}, ${city}`;
-    }
+=======
+   * Normalizza l'indirizzo dal formato parlato al formato "indirizzo civico, città"
+   * Supporta:
+   * 1. "città in via/viale/piazza... indirizzo civico" -> "via... indirizzo civico, città"
+   * 2. "via/viale/piazza... indirizzo civico città" -> "via... indirizzo civico, città"
+   * 3. "via/viale/piazza... indirizzo civico a/in città" -> "via... indirizzo civico, città"
+   */
+  private normalizeAddress(rawAddress: string): string {
+    const cleanAddress = rawAddress.trim();
+    const streetPrefixes = 'via|viale|piazza|corso|largo|vicolo|piazzale|strada';
+
+    // Pattern 1: "[città] in [via...] [indirizzo] [civico]"
+    // Es: "san prisco in via circumvallazione 65"
+    const cityFirstPattern = new RegExp(`^(.+?)\\s+in\\s+(${streetPrefixes})\\s+(.+)$`, 'i');
+    const cityFirstMatch = cleanAddress.match(cityFirstPattern);
     
-    // Se non matcha il pattern, ritorna l'indirizzo così com'è
-    return rawAddress;
+    if (cityFirstMatch) {
+      const city = cityFirstMatch[1].trim();
+      const streetType = cityFirstMatch[2].trim();
+      const rest = cityFirstMatch[3].trim();
+      return `${streetType} ${rest}, ${city}`;
+>>>>>>> d2aac2021e99dc0c5cc5614b5acecf3bd2cd7c2f
+    }
+
+    // Pattern 2 & 3: "[via...] [indirizzo] [civico] (a|in) [città]" oppure "[via...] [indirizzo] [civico] [città]"
+    // Questo è più complesso da separare senza un separatore chiaro, proviamo a catturare la città alla fine.
+    // Assumiamo che la città sia l'ultima parte della stringa se c'è un numero civico prima.
+    
+    // Cerchiamo un numero seguito da spazio e poi altro testo (che assumiamo essere la città)
+    // Es: "via roma 10 milano" -> "via roma 10", "milano"
+    const streetFirstPattern = new RegExp(`^(${streetPrefixes})\\s+(.+?\\s+\\d+)\\s+(?:a\\s+|in\\s+)?(.+)$`, 'i');
+    const streetFirstMatch = cleanAddress.match(streetFirstPattern);
+
+    if (streetFirstMatch) {
+      const streetType = streetFirstMatch[1].trim();
+      const streetAndNumber = streetFirstMatch[2].trim();
+      const city = streetFirstMatch[3].trim();
+      return `${streetType} ${streetAndNumber}, ${city}`;
+    }
+
+    // Se non matcha i pattern complessi ma inizia con via/viale, assumiamo sia solo indirizzo
+    // oppure proviamo a formattarlo meglio se possibile, ma per ora ritorniamo raw
+    return cleanAddress;
   }
 
   /**

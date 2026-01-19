@@ -33,7 +33,9 @@
         "BLUETOOTH_ADMIN",
         "BLUETOOTH_SCAN",
         "BLUETOOTH_CONNECT",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "RECORD_AUDIO",
+        "INTERNET"
       ],
       "config": {
         "googleMaps": {
@@ -92,8 +94,7 @@
           "bluetoothAlwaysPermission": "L'app vuole connettersi a dispositivi Bluetooth"
         }
       ],
-      "expo-web-browser",
-      "./plugins/withVoskModule"
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
