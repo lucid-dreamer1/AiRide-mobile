@@ -403,11 +403,8 @@ export default function HomeScreen() {
   });
   
   // 2. Assistente Vocale Hands-free (Hey Casco - STT)
-  useVoiceCommand({
+  const { isCommandWindowOpen } = useVoiceCommand({
     enabled: voiceSettings.enabled,
-    accessKey: '+0aml9jO2BKifVdFTCZgD93zHnZoP6ZaCBWEdYGWp8rD5TNRCBVZNQ==',
-    keywordPath: 'Hey-Casco_it_android_v4_0_0.ppn',
-    porcupineModelPath: 'porcupine_params_it.pv', // Necessario per keyword in Italiano
     onIntentDetected: (intent) => {
       console.log('[HomeScreen] Intento vocale rilevato:', intent);
       
@@ -433,6 +430,23 @@ export default function HomeScreen() {
   });
 
   // -------------------------------------------------------------
+  // LISTENING PANEL ANIMATION
+  // -------------------------------------------------------------
+  const listeningAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(listeningAnim, {
+      toValue: isCommandWindowOpen ? 1 : 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [isCommandWindowOpen]);
+
+  const listeningTranslate = listeningAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [50, 0], // Slide up from bottom
+  });
+
+  // -------------------------------------------------------------
   // PANEL ANIMATION
   // -------------------------------------------------------------
   const panelAnim = useRef(new Animated.Value(0)).current;
@@ -440,7 +454,7 @@ export default function HomeScreen() {
     Animated.timing(panelAnim, {
       toValue: showDemoPanel ? 1 : 0,
       duration: 180,
-      useNativeDriver: false,
+      useNativeDriver: false, // useNativeDriver: false because of layout properties if any, but checking below it uses translateY only so true could work but keeping consistency
     }).start();
   }, [showDemoPanel]);
 
@@ -583,6 +597,23 @@ export default function HomeScreen() {
         >
           <Feather name="trash-2" size={22} color="white" />
         </TouchableOpacity>
+      )}
+
+      {/* 🔹 LISTENING INDICATOR (VISIBILE QUANDO "HEY CASCO" ATTIVO) */}
+      {isCommandWindowOpen && (
+        <Animated.View
+          style={[
+            styles.listeningIndicator,
+            {
+              transform: [{ translateY: listeningTranslate }],
+              opacity: listeningAnim,
+            },
+          ]}
+        >
+          <View style={styles.listeningPulse} />
+          <Feather name="mic" size={24} color="white" />
+          <Text style={styles.listeningText}>Ti ascolto...</Text>
+        </Animated.View>
       )}
 
       {/* DEMO PANEL (SOLO SE DEMO_MODE) */}
@@ -863,5 +894,41 @@ const createStyles = (colors: any) =>
       fontSize: 17,
       fontWeight: "600",
       color: "white",
+    },
+
+    listeningIndicator: {
+        position: "absolute",
+        bottom: 110, // Sopra Instruction Card
+        alignSelf: "center",
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: colors.accent,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 30,
+        gap: 10,
+        elevation: 10,
+        zIndex: 999,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+    },
+    
+    listeningPulse: {
+        position: "absolute",
+        alignSelf: "center",
+        width: "120%",
+        height: "140%",
+        backgroundColor: colors.accent,
+        borderRadius: 40,
+        opacity: 0.3,
+        zIndex: -1,
+    },
+
+    listeningText: {
+        color: "white",
+        fontSize: 16,
+        fontWeight: "bold",
     },
   });
