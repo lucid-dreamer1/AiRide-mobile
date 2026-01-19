@@ -23,12 +23,16 @@ export class IntentParser {
   private wakeWordRegex = /\b(hey|ehi|ei|e il|il|a il|al|ok)\s+casco/i;
 
   /**
-<<<<<<< HEAD
-   * Normalizza l'indirizzo dal formato parlato al formato "indirizzo, città"
-   * Esempio: "san prisco in via circumvallazione 65" -> "via circumvallazione 65, san prisco"
-   * Esempio: "caserta via roma 13" -> "via roma 13, caserta"
+   * Normalizza l'indirizzo dal formato parlato al formato "indirizzo civico, città"
+   * Supporta:
+   * 1. "città in via/viale/piazza... indirizzo civico" -> "via... indirizzo civico, città"
+   * 2. "via/viale/piazza... indirizzo civico città" -> "via... indirizzo civico, città"
+   * 3. "via/viale/piazza... indirizzo civico a/in città" -> "via... indirizzo civico, città"
    */
   private normalizeAddress(rawAddress: string): string {
+    const cleanAddress = rawAddress.trim();
+    const streetPrefixes = 'via|viale|piazza|corso|largo|vicolo|piazzale|strada';
+
     // Pattern: "[città] (in) via/viale... [indirizzo]"
     // L'uso di "in" è ora opzionale
     const addressPattern = /^(.+?)\s+(?:in\s+)?(via|viale|piazza|corso|largo|vicolo|strada)\s+(.+)$/i;
@@ -40,28 +44,6 @@ export class IntentParser {
       const streetAddress = match[3].trim();
       // Ricostruisci: "via roma 13, caserta"
       return `${streetType} ${streetAddress}, ${city}`;
-=======
-   * Normalizza l'indirizzo dal formato parlato al formato "indirizzo civico, città"
-   * Supporta:
-   * 1. "città in via/viale/piazza... indirizzo civico" -> "via... indirizzo civico, città"
-   * 2. "via/viale/piazza... indirizzo civico città" -> "via... indirizzo civico, città"
-   * 3. "via/viale/piazza... indirizzo civico a/in città" -> "via... indirizzo civico, città"
-   */
-  private normalizeAddress(rawAddress: string): string {
-    const cleanAddress = rawAddress.trim();
-    const streetPrefixes = 'via|viale|piazza|corso|largo|vicolo|piazzale|strada';
-
-    // Pattern 1: "[città] in [via...] [indirizzo] [civico]"
-    // Es: "san prisco in via circumvallazione 65"
-    const cityFirstPattern = new RegExp(`^(.+?)\\s+in\\s+(${streetPrefixes})\\s+(.+)$`, 'i');
-    const cityFirstMatch = cleanAddress.match(cityFirstPattern);
-    
-    if (cityFirstMatch) {
-      const city = cityFirstMatch[1].trim();
-      const streetType = cityFirstMatch[2].trim();
-      const rest = cityFirstMatch[3].trim();
-      return `${streetType} ${rest}, ${city}`;
->>>>>>> d2aac2021e99dc0c5cc5614b5acecf3bd2cd7c2f
     }
 
     // Pattern 2 & 3: "[via...] [indirizzo] [civico] (a|in) [città]" oppure "[via...] [indirizzo] [civico] [città]"
