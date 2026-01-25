@@ -4,6 +4,9 @@ export type VoiceIntent =
   | { type: 'CANCEL_NAVIGATION' }
   | { type: 'RECALCULATE_ROUTE' }
   | { type: 'RETURN_TO_PREVIOUS_ROUTE' }
+  | { type: 'CALL_CONTACT'; contactName: string }
+  | { type: 'ANSWER_CALL' }
+  | { type: 'HANG_UP' }
   | { type: 'UNKNOWN'; rawText: string };
 
 export class IntentParser {
@@ -115,6 +118,14 @@ export class IntentParser {
     if (this.cancelRegex.test(commandText)) return { type: 'CANCEL_NAVIGATION' };
     if (this.backRegex.test(commandText)) return { type: 'RETURN_TO_PREVIOUS_ROUTE' };
     if (commandText.includes('ricalcola')) return { type: 'RECALCULATE_ROUTE' };
+
+    // Chiamate
+    if (commandText.match(/chiama\s+(.*)/i)) {
+      const match = commandText.match(/chiama\s+(.*)/i);
+      return { type: 'CALL_CONTACT', contactName: match ? match[1].trim() : '' };
+    }
+    if (commandText.match(/(rispondi|pronto|rispondere)/i)) return { type: 'ANSWER_CALL' };
+    if (commandText.match(/(attacca|termina|chiudi|metti giù|stop\s+chiamata)/i)) return { type: 'HANG_UP' };
 
     return { type: 'UNKNOWN', rawText: text };
   }

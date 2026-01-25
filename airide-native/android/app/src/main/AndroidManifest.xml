@@ -19,7 +19,18 @@
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WAKE_LOCK"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <uses-permission android:name="android.permission.BLUETOOTH_LE" />
   <uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>
+  
+  <!-- Permissions for AiRide Call Module -->
+  <uses-permission android:name="android.permission.CALL_PHONE" />
+  <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+  <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+  
+  <!-- Permissions for Contacts -->
+  <uses-permission android:name="android.permission.READ_CONTACTS" />
+  <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+  
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>
@@ -49,5 +60,11 @@
     </activity>
     <uses-library android:name="org.apache.http.legacy" android:required="false"/>
     <service android:name="com.asterinet.react.bgactions.RNBackgroundActionsTask" android:foregroundServiceType="location"/>
+    
+    <receiver android:name=".CallStateListener" android:enabled="true" android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.PHONE_STATE" />
+        </intent-filter>
+    </receiver>
   </application>
 </manifest>

@@ -36,6 +36,8 @@ import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useVoiceCommand } from "@/hooks/useVoiceCommand";
 import { useVoiceSettings } from "@/contexts/VoiceSettingsContext";
 import { BackgroundNavigation } from "../../services/BackgroundNavigation";
+import CallModule from "@/services/callModule"; 
+import * as Contacts from 'expo-contacts'; // <--- Import Contacts
 
 const DEMO_MODE = true;
 
@@ -422,7 +424,7 @@ export default function HomeScreen() {
   // 2. Assistente Vocale Hands-free (Hey Casco - STT)
   const { isCommandWindowOpen } = useVoiceCommand({
     enabled: voiceSettings.enabled,
-    onIntentDetected: (intent) => {
+      onIntentDetected: (intent) => {
       console.log('[HomeScreen] Intento vocale rilevato:', intent);
       
       switch (intent.type) {
@@ -446,6 +448,57 @@ export default function HomeScreen() {
             Toast.show({ type: 'info', text1: 'Ricalcolo: evita autostrade' });
             fetchRoute();
           }
+          break;
+        
+        // 📞 CHIAMATE
+        case 'CALL_CONTACT':
+          console.log('📞 Chiamata a:', intent.contactName);
+          
+          const target = intent.contactName.trim();
+          
+          // Se è un numero, chiama diretto
+          if (target.match(/^[0-9+]+$/)) {
+             CallModule.makeCall(target);
+             return; 
+          }
+
+          // Altrimenti cerca in rubrica
+          (async () => {
+             const { status } = await Contacts.requestPermissionsAsync();
+             if (status === 'granted') {
+                const { data } = await Contacts.getContactsAsync({
+                   name: target,
+                   fields: [Contacts.Fields.PhoneNumbers],
+                });
+
+                if (data.length > 0) {
+                   const contact = data[0];
+                   const number = contact.phoneNumbers?.[0]?.number;
+                   
+                   if (number) {
+                      // Pulisci il numero da spazi o caratteri strani se necessario
+                      const cleanNumber = number.replace(/[\s()-]/g, ''); 
+                      console.log(`📞 Contatto trovato: ${contact.name} -> ${cleanNumber}`);
+                      Toast.show({ type: 'success', text1: 'Chiamata in corso', text2: `${contact.name}` });
+                      CallModule.makeCall(cleanNumber);
+                   } else {
+                     Toast.show({ type: 'error', text1: 'Contatto senza numero', text2: contact.name });
+                   }
+                } else {
+                   Toast.show({ type: 'error', text1: 'Contatto non trovato', text2: target });
+                }
+             } else {
+               Toast.show({ type: 'error', text1: 'Permessi contatti negati' });
+             }
+          })();
+          break;
+        case 'ANSWER_CALL':
+          console.log('📞 Rispondo alla chiamata...');
+          CallModule.answerCall();
+          break;
+        case 'HANG_UP':
+          console.log('📞 Chiudo la chiamata...');
+          CallModule.hangUp();
           break;
       }
     },
