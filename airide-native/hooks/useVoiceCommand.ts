@@ -1,10 +1,22 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { NativeModules, NativeEventEmitter } from 'react-native';
+import { Platform } from 'react-native';
+import { 
+  loadModel, 
+  start, 
+  stop, 
+  unload, 
+  onPartialResult, 
+  onResult, 
+  onError 
+} from 'react-native-vosk';
 import { IntentParser, VoiceIntent } from '../utils/IntentParser';
 
-
-const { VoskModule } = NativeModules;
-const voskEmitter = new NativeEventEmitter(VoskModule);
+// DEFINIZIONE REGEX AVANZATA (Fuori dal component per performance)
+// \b -> inizio parola
+// (hey|ehi...|al) -> tutte le varianti fonetiche del saluto o articoli che suonano simili
+// (\s+(il|i|lo|l|un))? -> cattura opzionalmente articoli spuri (es. "e il casco")
+// \s+casco -> la parola chiave finale
+const WAKE_WORD_REGEX = /\b(hey|ehi|ei|eh|hai|ok|ciao|e|è|i|il|el|al|un|a)(\s+(il|i|lo|l|un))?\s+casco\b/i;
 
 interface UseVoiceCommandProps {
   enabled: boolean;
@@ -12,11 +24,6 @@ interface UseVoiceCommandProps {
   onIntentDetected: (intent: VoiceIntent) => void;
 }
 
-type VoiceMode = 'WAKE_WORD' | 'COMMAND';
-
-/**
- * Hook per l'ascolto continuo usarendo Vosk (Hands-free)
- */
 export function useVoiceCommand({
   enabled,
   modelPath = 'model',
@@ -24,27 +31,25 @@ export function useVoiceCommand({
 }: UseVoiceCommandProps) {
   const [isListening, setIsListening] = useState(false);
   const intentParser = useRef(new IntentParser());
-  const isModelReady = useRef(false);
-  const isModelReadyRef = useRef(false); // Alias for compatibility
+  const isModelReadyRef = useRef(false);
   const isVoskActiveRef = useRef(false);
-  const currentMode = useRef<VoiceMode>('WAKE_WORD');
-  const onIntentDetectedRef = useRef(onIntentDetected);
   
-  // Timestamp dell'ultima wake word rilevata per gestire comandi spezzati
   const lastWakeWordTime = useRef<number>(0);
-  const WAKE_WORD_WINDOW = 5000; // 5 secondi di finestra per il comando
-
-  // Stato per indicare all'UI che siamo in attesa di un comando (Visual Feedback)
+  const WAKE_WORD_WINDOW = 5000; 
   const [isCommandWindowOpen, setIsCommandWindowOpen] = useState(false);
 
-  // Wake Word Grammar - Restricted for accuracy. Removed single "casco" to avoid false positives.
-  const WAKE_GRAMMAR = ["hey casco", "ehi casco", "[unk]"];
+  // Wake Word Detection Logic
+  const checkWakeWord = (text: string) => {
+    // Usa la regex unificata per il test
+    if (WAKE_WORD_REGEX.test(text)) {
+      console.log('⚡ [VoiceCommand] Wake word rilevata!');
+      lastWakeWordTime.current = Date.now();
+      if (!isCommandWindowOpen) setIsCommandWindowOpen(true);
+      return true;
+    }
+    return false;
+  };
 
-  useEffect(() => {
-    onIntentDetectedRef.current = onIntentDetected;
-  }, [onIntentDetected]);
-
-  // Gestione timeout finestra comandi per reset UI
   useEffect(() => {
     let timeout: any;
     if (isCommandWindowOpen) {
@@ -56,168 +61,143 @@ export function useVoiceCommand({
   }, [isCommandWindowOpen]);
 
   const stopVosk = useCallback(async () => {
-    if (!isVoskActiveRef.current) {
-      console.log('[VoiceCommand] Vosk già fermo, skip');
-      return;
-    }
     try {
-      console.log('[VoiceCommand] Fermo Vosk STT...');
-      await VoskModule.stopListening();
-      isVoskActiveRef.current = false;
-      setIsListening(false);
+      if (isVoskActiveRef.current) {
+        console.log('[VoiceCommand] Stop Vosk...');
+        stop();
+        isVoskActiveRef.current = false;
+        setIsListening(false);
+      }
     } catch (e) {
-      console.error('[VoiceCommand] Errore stop Vosk:', e);
+      console.error('[VoiceCommand] Stop Error:', e);
     }
   }, []);
 
   const startVosk = useCallback(async () => {
     if (!isModelReadyRef.current) {
-      console.warn('[VoiceCommand] Impossibile avviare STT: Modello non pronto');
+      console.warn('[VoiceCommand] Modello non pronto.');
       return;
     }
-    if (isVoskActiveRef.current) {
-      console.log('[VoiceCommand] Vosk già attivo, skip');
-      return;
-    }
+    if (isVoskActiveRef.current) return;
+
     try {
-      console.log('[VoiceCommand] Avvio Vosk STT...');
+      try {
+        stop();
+        await new Promise(r => setTimeout(r, 200));
+      } catch (e) {}
+
+      console.log('[VoiceCommand] Avvio ascolto...');
       isVoskActiveRef.current = true;
-      await VoskModule.startListening();
       setIsListening(true);
+      
+      await start(); 
+      console.log('[VoiceCommand] ✅ Vosk avviato!'); 
+      
     } catch (e) {
-      console.error('[VoiceCommand] Errore avvio Vosk:', e);
+      console.error('[VoiceCommand] Start Error:', e);
       isVoskActiveRef.current = false;
+      setIsListening(false);
     }
   }, []);
 
-
-
-  // Inizializza Vosk Model una sola volta
   useEffect(() => {
     const init = async () => {
       try {
-        console.log('[VoiceCommand] Inizializzazione Vosk Model...');
-        await VoskModule.initModel(modelPath);
-        console.log('[VoiceCommand] Vosk Model pronto!');
+        console.log(`[VoiceCommand] Caricamento modello: ${modelPath}`);
+        await loadModel(modelPath);
+        console.log('[VoiceCommand] Modello caricato!');
         isModelReadyRef.current = true;
-        // Se enabled era già true, avvia l'ascolto ora che il modello è pronto
         if (enabled) {
           startVosk();
         }
       } catch (e) {
-        console.error('[VoiceCommand] Errore Vosk Init:', e);
+        console.error('[VoiceCommand] Init Error:', e);
       }
     };
     init();
-  }, [modelPath]); // Rimosso startVosk/enabled dalle deps qui per evitare loop, gestito in useEffect separato
 
-  // Listener per i risultati Vosk
-  useEffect(() => {
-    const resultSub = voskEmitter.addListener('onVoskResult', (resultJson: string) => {
-      console.log('[VoiceCommand] Vosk Result ricevuto:', resultJson);
-      
-      // Android SpeechRecognizer si ferma automaticamente dopo un risultato.
-      // Segnamo che non è più attivo per permettere il riavvio.
-      isVoskActiveRef.current = false;
-
+    return () => {
+      console.log('[VoiceCommand] 🛑 Unmount...');
       try {
-        const result = JSON.parse(resultJson);
-        const text = (result.text || '').toLowerCase();
+        stop();
+        unload();
+      } catch(e) { console.warn('Unmount error', e); }
+    };
+  }, [modelPath, enabled, startVosk]);
+
+  useEffect(() => {
+    const partialSub = onPartialResult((res) => {
+      try {
+        const text = typeof res === 'string' ? res : JSON.stringify(res);
+        if (text) {
+          checkWakeWord(text);
+        }
+      } catch(e) {}
+    });
+
+    const resultSub = onResult((res) => {
+      console.log(`📦Raw:`, res);
+      
+      try {
+        const text = (typeof res === 'string' ? res : String(res)).toLowerCase();
         
         if (text) {
-          // 1. Controlla se c'è la wake word nel testo corrente (anche a metà frase)
-          // Renderla più flessibile per errori di riconoscimento vocale
-          // Rimosso ^ per permettere wake word ovunque, non solo all'inizio
-          const wakeWordRegex = /\b(hey|ehi|ei|e il|il|a il|al|ok)\s+casco/i;
-          const wakeWordMatch = text.match(wakeWordRegex);
-          const hasWakeWord = !!wakeWordMatch;
-          
-          // Estrai il testo del comando (parte DOPO la wake word)
-          let textToParse = text;
-          if (hasWakeWord && wakeWordMatch) {
-             console.log('[VoiceCommand] Wake word rilevata! Apro finestra comandi.');
-             lastWakeWordTime.current = Date.now();
-             setIsCommandWindowOpen(true); // Attiva feedback UI
-             
-             // Prendi solo la parte dopo la wake word per il parsing
-             const wakeWordEndIndex = wakeWordMatch.index! + wakeWordMatch[0].length;
-             textToParse = text.substring(wakeWordEndIndex).trim();
-          }
+          console.log(`🎤 Sentito: "${text}"`);
 
-          // 2. Controlla se siamo nella finestra temporale
+          const justWokeUp = checkWakeWord(text);
           const isWithinWindow = (Date.now() - lastWakeWordTime.current) < WAKE_WORD_WINDOW;
 
-          // 3. Prova a parsare il comando
-          // Se siamo nella finestra o abbiamo appena sentito la wake word, permettiamo il parsing senza wake word esplicita
-          const intent = intentParser.current.parse(textToParse, { 
-              skipWakeWordCheck: isWithinWindow || hasWakeWord 
-          });
+          if (isWithinWindow || justWokeUp) {
+            // CRUCIALE: Usiamo la STESSA regex per pulire la frase
+            // Rimuove "e il casco", "hey casco", "el casco" ecc. dalla stringa
+            const cleanText = text.replace(WAKE_WORD_REGEX, '').trim();
+            
+            console.log(`🧹 Testo pulito per parser: "${cleanText}"`);
 
-          if (intent.type !== 'UNKNOWN') {
-             console.log('[VoiceCommand] Intent valido rilevato:', intent);
-             onIntentDetectedRef.current(intent);
-             
-             lastWakeWordTime.current = 0; 
-             setIsCommandWindowOpen(false); // Chiudi feedback UI dopo comando eseguito
-          } else {
-             if (hasWakeWord) {
-                 // Wake word presente ma nessun comando (es. solo "Hey Casco")
-                 console.log('[VoiceCommand] In attesa di comando...');
-             } else {
-                 console.log('[VoiceCommand] Intent UNKNOWN o fuori finestra:', intent.rawText);
-             }
+            if (cleanText.length > 0) {
+              const intent = intentParser.current.parse(cleanText, { 
+                skipWakeWordCheck: true 
+              });
+
+              if (intent.type !== 'UNKNOWN') {
+                console.log('✅ Comando:', intent.type);
+                onIntentDetected(intent);
+                setIsCommandWindowOpen(false);
+                lastWakeWordTime.current = 0; 
+              } else {
+                console.log('⚠️ Comando sconosciuto:', cleanText);
+              }
+            } else if (justWokeUp) {
+              console.log('🦻 In attesa di comando...');
+            }
           }
         }
       } catch (e) {
-        console.error('[VoiceCommand] Errore Vosk Result:', e);
-      }
-      
-      // Riavvia l'ascolto per il loop continuo (Hands-free)
-      if (enabled) {
-          setTimeout(() => {
-             if (enabled) startVosk();
-          }, 200); 
+        console.error('Process Error', e);
       }
     });
 
-    const errorSub = voskEmitter.addListener('onVoskError', (error: string) => {
-      const isNoSpeech = error.includes('No speech match');
+    const errorSub = onError((err) => {
+      const errStr = String(err);
+      if (!errStr.includes('No speech')) console.log('[VoiceCommand] Error:', err);
       
-      // Android SpeechRecognizer si ferma su errore.
       isVoskActiveRef.current = false;
-
-      if (isNoSpeech) {
-          // "No speech match" è normale se c'è silenzio. Non loggare come errore.
-          // console.debug('[VoiceCommand] Silenzio rilevato (timeout)...');
-      } else {
-          console.error('[VoiceCommand] Vosk Error:', error);
-      }
-
-      // Se Vosk si ferma dopo l'errore (timeout), dobbiamo riavviarlo per mantenere l'ascolto continuo.
-      if (enabled && isModelReadyRef.current) {
-          // Se è solo timeout, riavvia subito o con minimo delay
-          const delay = isNoSpeech ? 100 : 2000; 
-          
-          if (!isNoSpeech) console.log(`[VoiceCommand] Riavvio Vosk tra ${delay}ms...`);
-          
-          setTimeout(() => {
-              // Riavvia solo se ancora abilitato
-              if (enabled) startVosk(); 
-          }, delay);
+      if (enabled) {
+        setTimeout(() => startVosk(), 1000);
       }
     });
 
     return () => {
+      partialSub.remove();
       resultSub.remove();
       errorSub.remove();
     };
-  }, [enabled, startVosk]); // Aggiunto startVosk
+  }, [enabled, startVosk, onIntentDetected]);
 
-  // Gestisci enabled/disabled
   useEffect(() => {
     if (enabled && isModelReadyRef.current && !isVoskActiveRef.current) {
       startVosk();
-    } else if (!enabled && isVoskActiveRef.current) {
+    } else if (!enabled) {
       stopVosk();
     }
   }, [enabled, startVosk, stopVosk]);

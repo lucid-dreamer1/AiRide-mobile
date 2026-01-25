@@ -1,24 +1,4 @@
 pluginManagement {
-  repositories {
-    google()
-    mavenCentral()
-    gradlePluginPortal()
-  }
-
-  resolutionStrategy {
-    eachPlugin {
-      if (requested.id.id == "org.jetbrains.kotlin.android") {
-        useVersion("2.1.20")
-      }
-      if (requested.id.id == "org.jetbrains.kotlin.jvm") {
-        useVersion("2.1.20")
-      }
-      if (requested.id.id == "org.jetbrains.kotlin.plugin.serialization") {
-        useVersion("2.1.20")
-      }
-    }
-  }
-
   def reactNativeGradlePlugin = new File(
     providers.exec {
       workingDir(rootDir)
@@ -42,15 +22,6 @@ plugins {
   id("expo-autolinking-settings")
 }
 
-dependencyResolutionManagement {
-  versionCatalogs {
-    libs {
-      version('kotlin', '1.9.24')
-    }
-  }
-
-}
-
 extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
   if (System.getenv('EXPO_USE_COMMUNITY_AUTOLINKING') == '1') {
     ex.autolinkLibrariesFromCommand()
@@ -66,3 +37,6 @@ expoAutolinking.useExpoVersionCatalog()
 
 include ':app'
 includeBuild(expoAutolinking.reactNativeGradlePlugin)
+
+include ':react-native-vosk'
+project(':react-native-vosk').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-vosk/android')

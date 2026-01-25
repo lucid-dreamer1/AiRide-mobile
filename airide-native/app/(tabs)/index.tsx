@@ -35,8 +35,9 @@ import useNavigationUpdater from "@/hooks/useNavigationUpdater";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useVoiceCommand } from "@/hooks/useVoiceCommand";
 import { useVoiceSettings } from "@/contexts/VoiceSettingsContext";
+import { BackgroundNavigation } from "../../services/BackgroundNavigation";
 
-const DEMO_MODE = false;
+const DEMO_MODE = true;
 
 type Point = { latitude: number; longitude: number };
 
@@ -240,6 +241,23 @@ export default function HomeScreen() {
     };
   }, [isNavigating]); 
 
+  // -------------------------------------------------------------
+  // GESTIONE BACKGROUND SERVICE
+  // -------------------------------------------------------------
+  // -------------------------------------------------------------
+  // GESTIONE BACKGROUND SERVICE
+  // -------------------------------------------------------------
+  useEffect(() => {
+    console.log("🟦 [Index] isNavigating changed:", isNavigating);
+    if (isNavigating) {
+      console.log("🟦 [Index] Chiamata a BackgroundNavigation.start()...");
+      BackgroundNavigation.start();
+    } else {
+      console.log("🟦 [Index] Chiamata a BackgroundNavigation.stop()...");
+      BackgroundNavigation.stop();
+    }
+  }, [isNavigating]); 
+
 
   // -------------------------------------------------------------
   // DEMO MOVEMENT
@@ -360,9 +378,8 @@ export default function HomeScreen() {
       );
 
       // 🔥 AVVIA LA NAVIGATION LOOP REALE
-      if (!DEMO_MODE) {
-        setIsNavigating(true);
-      }
+      // 🔥 AVVIA LA NAVIGATION LOOP REALE (Anche in Demo Mode per testare BG)
+      setIsNavigating(true);
 
     } catch (err) {
       Toast.show({
@@ -412,9 +429,14 @@ export default function HomeScreen() {
         case 'NAVIGATE_TO':
           setDestination(intent.destination);
           fetchRoute(intent.destination);
+          // 🎤 AVVIO BACKGROUND ANCHE DA VOCE
+          console.log("🎤 Avvio Background Service da comando vocale...");
+          BackgroundNavigation.start();
+          setIsNavigating(true); // Aggiorna anche stato UI
           break;
         case 'CANCEL_NAVIGATION':
           handleResetRoute();
+          BackgroundNavigation.stop(); // Stop anche da voce
           break;
         case 'RECALCULATE_ROUTE':
           fetchRoute();

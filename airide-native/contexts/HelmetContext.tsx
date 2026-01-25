@@ -12,10 +12,12 @@ import { BleManager, Device } from "react-native-ble-plx";
 import { Platform, PermissionsAndroid } from "react-native";
 import base64 from "react-native-base64";
 
-const manager = new BleManager();
+import { bleService } from "../services/BleSingleton";
+
+// const manager = new BleManager(); // Rimosso: usa Singleton
 
 // 🟦 ATTIVA/DISATTIVA MOCK
-const MOCK_BLE = false;
+const MOCK_BLE = true;
 
 type HelmetContextType = {
   device: Device | null;
@@ -77,7 +79,8 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     return () => {
-      if (!MOCK_BLE) manager.destroy();
+      // Non distruggiamo il manager qui perché è gestito dal Singleton e serve al background
+      // if (!MOCK_BLE) bleService.manager.destroy(); 
     };
   }, []);
 
@@ -87,13 +90,11 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
   const scanAndConnect = useCallback(async () => {
     // 🟦 MOCK BLE — Simulazione completa
     if (MOCK_BLE) {
-      console.log("🟦 MOCK: Avvio scansione finta…");
+      console.log("🟦 MOCK: Avvio scansione finta (Conn Only)...");
       setScanning(true);
       setError(null);
 
       setTimeout(() => {
-        console.log("🟦 MOCK: Casco finto trovato!");
-
         const fakeDevice: Device = {
           id: "MOCK-DEVICE",
           name: "DSD TECH (MOCK)",
@@ -101,12 +102,14 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
           connect: async () => fakeDevice,
           cancelConnection: async () => {},
           discoverAllServicesAndCharacteristics: async () => fakeDevice,
+          writeCharacteristicWithoutResponseForService: async () => {}, 
         } as any;
 
         setDevice(fakeDevice);
         setConnected(true);
+        bleService.setConnectedDevice(fakeDevice); // SYNC Singleton
         setScanning(false);
-        console.log("🟦 MOCK: Casco finto connesso!");
+        console.log("🟦 MOCK: Casco finto connesso (Ready for BG Service)!");
       }, 1200);
 
       return;
@@ -120,7 +123,7 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const state = await manager.state();
+      const state = await bleService.manager.state();
       if (state !== "PoweredOn") {
         setError(`Bluetooth non attivo (Stato: ${state}). Attivalo e riprova.`);
         return;
@@ -135,12 +138,12 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     return new Promise<void>((resolve) => {
-      manager.startDeviceScan(null, null, async (scanError, found) => {
+      bleService.manager.startDeviceScan(null, null, async (scanError, found) => {
         if (scanError) {
           console.error("BLE Scan Error:", scanError);
           setError(`Errore scansione BLE: ${scanError.message} (Code: ${scanError.errorCode})`);
           setScanning(false);
-          manager.stopDeviceScan();
+          bleService.manager.stopDeviceScan();
           return resolve();
         }
 
@@ -158,13 +161,14 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
         if (nameMatches || serviceMatches) {
           console.log("🎯 Dispositivo identificato:", name);
 
-          manager.stopDeviceScan();
+          bleService.manager.stopDeviceScan();
 
           try {
             const connectedDevice = await found.connect();
             await connectedDevice.discoverAllServicesAndCharacteristics();
 
             setDevice(connectedDevice);
+            bleService.setConnectedDevice(connectedDevice); // <--- Sync Singleton
             setConnected(true);
             setError(null);
 
@@ -180,7 +184,7 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
 
       setTimeout(() => {
         if (scanning) {
-          manager.stopDeviceScan();
+          bleService.manager.stopDeviceScan();
           setScanning(false);
           if (!connected) setError("Casco non trovato");
           resolve();
@@ -195,7 +199,7 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
   const sendToHelmet = useCallback(
     async (text: string) => {
       if (MOCK_BLE) {
-        console.log("🟦 MOCK SEND:", text);
+        // console.log("🟦 MOCK SEND:", text); // DISABILITATO: Gestito dal Background Service
         return;
       }
 
@@ -204,20 +208,8 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const SERVICE_UUID = "0000FFE0-0000-1000-8000-00805F9B34FB";
-      const CHARACTERISTIC_UUID = "0000FFE1-0000-1000-8000-00805F9B34FB";
-
       try {
-        const payload = (text.endsWith("\n") ? text : text + "\n").slice(0, 20);
-        const msg = base64.encode(payload);
-
-        await device.writeCharacteristicWithoutResponseForService(
-          SERVICE_UUID,
-          CHARACTERISTIC_UUID,
-          msg
-        );
-
-        console.log("📤 Inviato al casco:", payload);
+        await bleService.sendToHelmet(text);
       } catch (err) {
         setError("Errore invio dati");
       }
@@ -232,6 +224,7 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
     if (MOCK_BLE) {
       console.log("🟦 MOCK: Disconnessione casco finto");
       setDevice(null);
+      bleService.setConnectedDevice(null);
       setConnected(false);
       return;
     }
@@ -242,6 +235,7 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
       console.log("Errore disconnessione:", e);
     } finally {
       setDevice(null);
+      bleService.setConnectedDevice(null);
       setConnected(false);
     }
   }, [device]);

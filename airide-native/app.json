@@ -35,7 +35,11 @@
         "BLUETOOTH_CONNECT",
         "ACCESS_FINE_LOCATION",
         "RECORD_AUDIO",
-        "INTERNET"
+        "INTERNET",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "WAKE_LOCK",
+        "ACCESS_BACKGROUND_LOCATION"
       ],
       "config": {
         "googleMaps": {
@@ -65,7 +69,16 @@
             ],
             "compileSdkVersion": 36,
             "targetSdkVersion": 36,
-            "minSdkVersion": 24
+            "minSdkVersion": 24,
+            "extraManifestElements": [
+              {
+                "name": "service",
+                "attributes": {
+                  "android:name": "com.asterinet.react.bgactions.RNBackgroundActionsTask",
+                  "android:foregroundServiceType": "location"
+                }
+              }
+            ]
           },
           "ios": {
             "useFrameworks": "static"
