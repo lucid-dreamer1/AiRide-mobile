@@ -68,8 +68,14 @@ const CallModule = {
 
   addCallListener: (callback) => {
     if (Platform.OS === 'android') {
-        // Events emitted via RCTDeviceEventEmitter.class in Java are received by DeviceEventEmitter in JS
         return DeviceEventEmitter.addListener('CallRinging', callback);
+    }
+    return { remove: () => {} };
+  },
+
+  addStatusListener: (callback) => {
+    if (Platform.OS === 'android') {
+        return DeviceEventEmitter.addListener('CallStatusChanged', callback);
     }
     return { remove: () => {} };
   }

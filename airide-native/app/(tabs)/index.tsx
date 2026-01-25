@@ -412,7 +412,21 @@ export default function HomeScreen() {
     });
   };
 
-  useNavigationUpdater(currentInstruction, setCurrentInstruction);
+// ... (keeping existing imports)
+
+  const [callStatus, setCallStatus] = useState<number>(0); 
+  // 0: Nessuna, 1: In arrivo, 2: Attiva, 3: Conclusa
+
+  useEffect(() => {
+    const sub = CallModule.addStatusListener((event: any) => {
+        console.log("📞 STATUS CHANGED:", event);
+        setCallStatus(event.status);
+        if (event.status === 3) setTimeout(() => setCallStatus(0), 3000); 
+    });
+    return () => { if(sub) sub.remove(); };
+  }, []);
+
+  useNavigationUpdater(currentInstruction, setCurrentInstruction, callStatus);
 
   // 1. Assistente Vocale Navigation (TTS)
   useVoiceAssistant({
@@ -424,8 +438,9 @@ export default function HomeScreen() {
   // 2. Assistente Vocale Hands-free (Hey Casco - STT)
   const { isCommandWindowOpen } = useVoiceCommand({
     enabled: voiceSettings.enabled,
-      onIntentDetected: (intent) => {
+    onIntentDetected: (intent) => {
       console.log('[HomeScreen] Intento vocale rilevato:', intent);
+
       
       switch (intent.type) {
         case 'NAVIGATE_TO':
@@ -740,6 +755,17 @@ export default function HomeScreen() {
         </>
       )}
 
+      {/* PHONE STATUS ICON */}
+      {callStatus > 0 && (
+        <View style={[styles.phoneStatusIcon, { backgroundColor: callStatus === 3 ? '#E74C3C' : '#2ECC71' }]}>
+             <Feather 
+                name={callStatus === 1 ? "phone-incoming" : (callStatus === 2 ? "phone-call" : "phone-off")} 
+                size={22} 
+                color="white" 
+             />
+        </View>
+      )}
+
       {/* INSTRUCTION CARD */}
       {showInstructionCard && (
         <InstructionCard instruction={currentInstruction} />
@@ -812,6 +838,20 @@ const createStyles = (colors: any) =>
       backgroundColor: colors.accent,
       borderWidth: 3,
       borderColor: colors.card,
+    },
+
+    phoneStatusIcon: {
+      position: "absolute",
+      top: 135,
+      left: 20,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: "#2ECC71", // Green default
+      justifyContent: "center",
+      alignItems: "center",
+      elevation: 8,
+      zIndex: 999 
     },
 
     demoFab: {

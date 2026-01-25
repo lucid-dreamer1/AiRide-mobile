@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useHelmet } from "@/contexts/HelmetContext";
+import { BackgroundNavigation } from "@/services/BackgroundNavigation";
 
 
 export interface NavInstruction {
@@ -12,18 +13,28 @@ export interface NavInstruction {
   next?: NavInstruction;
 }
 
+
+
 export default function useNavigationUpdater(
   instruction: NavInstruction | null,
-  setInstruction: (i: NavInstruction | null) => void
+  setInstruction: (i: NavInstruction | null) => void,
+  callStatus: number 
 ): void {
 
   const { sendToHelmet, connected } = useHelmet();
-
-  // 👇 Gli hook devono sempre esistere, anche se non connesso
   const lastSent = useRef<number>(0);
 
+  // Sync stato background ogni volta che cambiano i dati
+  // Sync stato background ogni volta che cambiano i dati
   useEffect(() => {
-    // Se non connesso → non fare nulla
+     console.log("🪝 [useNavUpdater] Instruction Update:", instruction);
+     const arrow = instruction?.freccia ?? 0;
+     const dist = instruction?.metri ?? 0;
+     console.log(`🪝 [useNavUpdater] Updating BG State -> Arrow: ${arrow}, Dist: ${dist}, Call: ${callStatus}`);
+     BackgroundNavigation.updateState(arrow, dist, callStatus);
+  }, [instruction, callStatus]);
+
+  useEffect(() => {
     if (!connected) return;
     if (!instruction) return;
 
@@ -31,16 +42,11 @@ export default function useNavigationUpdater(
       const dist = instruction.metri ?? 0;
       const now = Date.now();
 
-      // 🔥 throttle invio BLE
+      // 🔥 throttle invio BLE FOREGROUND
       if (now - lastSent.current >= 250) {
         lastSent.current = now;
-
-        const rem = instruction.remaining_dist ?? 0;
-        const tot = instruction.total_dist ?? 0;
-
-        // Formato: freccia|metri_svolta|metri_rimanenti|metri_totali
-        // Usiamo Math.round per avere interi puliti
-        const packet = `${instruction.freccia}|${dist}|${Math.round(rem)}|${Math.round(tot)}`;
+        
+        const packet = `${instruction.freccia}|${dist}|${callStatus}`;
 
         sendToHelmet(packet).catch(() => {});
       }
@@ -53,5 +59,7 @@ export default function useNavigationUpdater(
     }, 100);
 
     return () => clearInterval(interval);
-  }, [instruction, connected]); // attenzione: aggiunto connected
+  }, [instruction, connected, callStatus]);
 }
+
+
