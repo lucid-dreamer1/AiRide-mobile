@@ -1,14 +1,16 @@
 import BackgroundService from 'react-native-background-actions';
 import Geolocation from 'react-native-geolocation-service';
 import { bleService } from './BleSingleton';
-import { DeviceEventEmitter, Platform } from 'react-native';
+import { DeviceEventEmitter } from 'react-native';
+import { updatePosition } from './api'; 
+import { NavigationStore } from './NavigationStore'; 
 
 const sleep = (time: number) => new Promise((resolve) => setTimeout(() => resolve(true), time));
 
 const options = {
     taskName: 'AirRideNav',
     taskTitle: 'AirRide è attivo',
-    taskDesc: 'Navigazione e controllo casco in corso',
+    taskDesc: 'Navigazione smart in corso',
     taskIcon: {
         name: 'ic_launcher',
         type: 'mipmap',
@@ -18,60 +20,99 @@ const options = {
     parameters: {
         delay: 1000,
     },
-};
-
-// Stato condiviso
-let currentState = {
-    arrow: 0,
-    distance: 0,
-    callStatus: 0
+    progressBar: {
+        max: 100,
+        value: 0,
+        indeterminate: true,
+    },
 };
 
 // GPS Options Aggressive
 const gpsOptions = {
     enableHighAccuracy: true,
-    timeout: 15000,
-    maximumAge: 10000,
+    timeout: 10000, 
+    maximumAge: 5000,
     forceRequestLocation: true,
 };
 
 const navigationTask = async (taskDataArguments: any) => {
     const { delay } = taskDataArguments;
+    console.log('[Background] 🧠 BRAIN AVVIATO: Logic moved to BG Task');
 
     await new Promise<void>(async (resolve) => {
-        console.log('[Background] 🟢 Servizio AVVIATO');
-
         while (BackgroundService.isRunning()) {
             try {
-                // Serializziamo la richiesta GPS per evitare "Location request timed out" (Code 3)
-                // Se fallisce, usiamo lo stato corrente (last known)
-                await new Promise<void>((resolveGPS, rejectGPS) => {
-                     Geolocation.getCurrentPosition(
-                        (position) => {
-                            // Qui potremmo aggiornare la navigazione reale se avessimo logica native
-                            resolveGPS();
-                        },
-                        (error) => {
-                            console.log('[Background] ⚠️ GPS Fatica:', error.code, error.message);
-                            // Risolviamo comunque per non bloccare il loop per sempre (anche se c'è timeout)
-                            resolveGPS();
-                        },
-                        gpsOptions
-                    );
-                });
+                // 1. CHIEDI IL GPS (Solo se NON in DEMO)
+                const currentStore = NavigationStore.get();
+                if (currentStore.isDemo) {
+                     // In DEMO MODE: Saltiamo GPS e API. 
+                     // Ci fidiamo che la UI aggiorni lo Store con i dati simulati.
+                     // Aspettiamo solo che il loop proceda all'invio BLE.
+                     // console.log('[Background] 🎮 Demo Mode Active - Skipping Real GPS');
+                } else {
+                    const position = await new Promise<any>((resolveGPS) => {
+                         let resolved = false;
+                         const onDone = (pos: any) => {
+                             if (!resolved) { resolved = true; resolveGPS(pos); }
+                         };
+    
+                         Geolocation.getCurrentPosition(
+                            (pos) => onDone(pos),
+                            (err) => {
+                                console.log('[Background] ⚠️ GPS Fatica:', err.code, err.message);
+                                onDone(null);
+                            },
+                            gpsOptions
+                        );
+    
+                        setTimeout(() => {
+                            if (!resolved) {
+                                console.log('[Background] ⚠️ GPS Timeout Manuale - Sblocco Loop');
+                                onDone(null);
+                            }
+                        }, 5000);
+                    });
+    
+                    // 2. LOGICA NAVIGAZIONE (Chiamata API)
+                    if (position && position.coords) {
+                        const { latitude, longitude } = position.coords;
+                        
+                        // Chiamiamo il backend per avere l'istruzione aggiornata
+                        const res = await updatePosition(latitude, longitude);
+    
+                        if (res && res.nav) {
+                            // console.log('[Background] 🔍 DEBUG NAV:', JSON.stringify(res.nav, null, 2));
+    
+                             const nav = res.nav;
+                             // Aggiorniamo lo Store Globale (così la UI si aggiorna se aperta)
+                             NavigationStore.set({
+                                 arrow: nav.freccia ?? 0,
+                                 distance: nav.metri ?? 0,
+                                 text: nav.testo ?? '',
+                                 nextArrow: nav.next?.freccia,
+                                 nextText: nav.next?.testo,
+                                 remainingDist: nav.remaining_dist,
+                                 totalDist: nav.total_dist
+                             });
+                        }
+                    } else {
+                        console.log('[Background] Posizione nulla, skip API call');
+                    }
+                }
 
-                // Costruiamo e inviamo il pacchetto
-                const { arrow, distance, callStatus } = currentState;
-                const packet = `${arrow}|${distance}|${callStatus}`;
-                
-                console.log(`[Background] 🟢 LOOP ALIVE | Data: ${packet}`);
+                // 3. PREPARA DATI DAL STORE
+                const currentData = NavigationStore.get();
+                const packet = `${currentData.arrow}|${currentData.distance}|${currentData.callStatus}`;
 
+                console.log(`[Background] 🟢 BRAIN LOOP | Packet: ${packet}`);
+
+                // 4. INVIA AL CASCO
                 if (bleService.getDevice()) {
                      await bleService.sendToHelmet(packet);
                 }
 
             } catch (error) {
-                console.log('[Background] Errore ciclo:', error);
+                console.log('[Background] ❌ Errore Ciclo Brain:', error);
             }
 
             await sleep(delay);
@@ -84,35 +125,26 @@ export const BackgroundNavigation = {
         console.log("[Manager] 🟢 start() richiamato. isRunning?", BackgroundService.isRunning());
         if (!BackgroundService.isRunning()) {
             try {
-                // Ascolta DIRETTAMENTE gli eventi chiamata nel background service
-                // Questo bypassa la UI di React che potrebbe essere freezata
+                // Listener Call Status (indipendente)
                 DeviceEventEmitter.addListener('CallStatusChanged', (event: any) => {
-                     console.log("[Manager] 📞 BG Event received:", event);
+                     console.log("[Manager] 📞 Call Event:", event);
                      if (event && typeof event.status === 'number') {
-                         currentState.callStatus = event.status;
+                         NavigationStore.set({ callStatus: event.status });
                      }
                 });
 
                 await BackgroundService.start(navigationTask, options);
-                console.log("[Manager] ✅ Start comando inviato correttamente");
+                console.log("[Manager] ✅ Brain Started");
             } catch (e) {
                 console.error("[Manager] ❌ Errore in Start:", e);
             }
-        } else {
-            console.log("[Manager] ⚠️ Il servizio risulta già attivo, skip start.");
         }
     },
     stop: async () => {
         if (BackgroundService.isRunning()) {
             await BackgroundService.stop();
-            console.log("[Manager] Stop comando inviato");
+            console.log("[Manager] Brain Stopped");
             DeviceEventEmitter.removeAllListeners('CallStatusChanged');
         }
     },
-    updateState: (arrow: number, distance: number, callStatus: number) => {
-        // Aggiorna tutto tranne callStatus se viene da UI (perché callStatus lo gestiamo anche nativamente)
-        // Ma per sicurezza teniamo sincronizzato tutto
-        currentState = { arrow, distance, callStatus };
-        // console.log(`[Manager] Stato aggiornato da UI: ${JSON.stringify(currentState)}`);
-    }
 };

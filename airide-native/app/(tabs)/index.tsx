@@ -11,7 +11,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
+  Linking,
+  Platform,
+  PermissionsAndroid,
+  StatusBar, 
 } from "react-native";
+import SystemNavigationBar from 'react-native-system-navigation-bar';
 import { useTheme } from "@/contexts/ThemeContext";
 
 import { saveRide } from "@/services/saveRide";
@@ -31,13 +36,14 @@ import {
 } from "@/services/api";
 import { useNavigationContext } from "@/navigation/NavigationContext";
 import { useHelmet } from "@/contexts/HelmetContext";
-import useNavigationUpdater from "@/hooks/useNavigationUpdater";
+// import useNavigationUpdater from "@/hooks/useNavigationUpdater"; // RIMOSSO
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useVoiceCommand } from "@/hooks/useVoiceCommand";
 import { useVoiceSettings } from "@/contexts/VoiceSettingsContext";
 import { BackgroundNavigation } from "../../services/BackgroundNavigation";
 import CallModule from "@/services/callModule"; 
-import * as Contacts from 'expo-contacts'; // <--- Import Contacts
+import * as Contacts from 'expo-contacts'; 
+import { NavigationStore } from "@/services/NavigationStore"; // <--- Import Store
 
 const DEMO_MODE = true;
 
@@ -47,6 +53,19 @@ const interpolate = (p1: Point, p2: Point, t: number): Point => ({
   latitude: p1.latitude + (p2.latitude - p1.latitude) * t,
   longitude: p1.longitude + (p2.longitude - p1.longitude) * t,
 });
+
+const setImmersiveMode = (enabled: boolean) => {
+    if (Platform.OS === 'android') {
+        if (enabled) {
+            StatusBar.setHidden(true);
+            SystemNavigationBar.navigationHide();
+            SystemNavigationBar.stickyImmersive();
+        } else {
+            StatusBar.setHidden(false);
+            SystemNavigationBar.navigationShow();
+        }
+    }
+};
 
 export default function HomeScreen() {
   const { themeColors } = useTheme();
@@ -127,6 +146,45 @@ export default function HomeScreen() {
         );
       } catch {}
     })();
+
+    // Richiedi TUTTI i permessi necessari all'avvio
+    // Richiedi TUTTI i permessi necessari all'avvio
+    if (Platform.OS === 'android') {
+        (async () => {
+             const result = await PermissionsAndroid.requestMultiple([
+                PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+                PermissionsAndroid.PERMISSIONS.CALL_PHONE,
+                PermissionsAndroid.PERMISSIONS.ANSWER_PHONE_CALLS,
+                PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
+                PermissionsAndroid.PERMISSIONS.READ_CONTACTS
+             ]);
+             console.log("Permissions result:", result);
+
+             // Optional prompt for Overlay (needed for background start on Android 10+)
+             if (Platform.Version >= 29) {
+                // Remove await call here or wrap in try/catch as PermissionsAndroid.check for overlay might not be supported directly
+                // Just open settings if needed
+                Toast.show({
+                    type: 'info',
+                    text1: 'Permesso Sovrapposizione',
+                    text2: 'Abilita "Mostra sopra altre app" se richiesto',
+                    visibilityTime: 4000
+                });
+                Linking.openSettings(); 
+             }
+        })();
+    }
+    
+    // Richiedi di ignorare l'ottimizzazione batteria (per background service)
+    if (Platform.OS === 'android') {
+        Toast.show({
+            type: "info",
+            text1: "Ottimizzazione Batteria",
+            text2: "Imposta 'Nessuna restrizione' per evitare blocchi.",
+            visibilityTime: 6000,
+        });
+        Linking.openSettings();
+    }
   }, []);
 
   // -------------------------------------------------------------
@@ -162,6 +220,7 @@ export default function HomeScreen() {
       setRouteCoords(coords);
       setDemoCanStart(false);
 
+      setImmersiveMode(true); // <--- ATTIVA IMMERSIVE MODE
       setShowInstructionCard(true);
       setCurrentInstruction({
         testo: "Percorso pronto 🚀",
@@ -210,25 +269,10 @@ export default function HomeScreen() {
               );
             }
 
-            // 3. Invia al server (throttle ~2s per non intasare)
-            if (now - lastGPSUpdate.current > 2000) {
-              lastGPSUpdate.current = now;
-              
-              // Chiama il backend per aggiornare l'istruzione
-              const res = await updatePosition(latitude, longitude);
-              if (res?.nav) {
-                // Iniettiamo i metadati delle distanze se non presenti
-                const totalMeters = (Number(String(routeInfo?.distance).replace(" km", "")) || 0) * 1000;
-                // Assumiamo che se il backend dà remaining_dist, sia in km (se non specificato diversamente)
-                const remainingMeters = res.nav.remaining_dist ? res.nav.remaining_dist * 1000 : totalMeters;
-
-                setCurrentInstruction({
-                  ...res.nav,
-                  total_dist: totalMeters,
-                  remaining_dist: remainingMeters
-                });
-              }
-            }
+            // 3. STOP API CALL QUI!
+            // Il "Brain" in background si occupa di chiamare updatePosition().
+            // Noi aggiorniamo solo la mappa visuale.
+            
           }
         );
       } catch (err) {
@@ -306,6 +350,17 @@ export default function HomeScreen() {
               total_dist: totalMeters,
               remaining_dist: remainingMeters
             });
+
+            // ⚡ AGGIORNA STORE PER CASCO (In Demo)
+            NavigationStore.set({
+                 arrow: res.nav.freccia ?? 0,
+                 distance: res.nav.metri ?? 0,
+                 text: res.nav.testo ?? '',
+                 nextArrow: res.nav.next?.freccia,
+                 nextText: res.nav.next?.testo,
+                 remainingDist: remainingMeters,
+                 totalDist: totalMeters,
+            });
           }
         });
       }
@@ -381,6 +436,7 @@ export default function HomeScreen() {
 
       // 🔥 AVVIA LA NAVIGATION LOOP REALE
       // 🔥 AVVIA LA NAVIGATION LOOP REALE (Anche in Demo Mode per testare BG)
+      if (DEMO_MODE) NavigationStore.set({ isDemo: true });
       setIsNavigating(true);
 
     } catch (err) {
@@ -393,7 +449,9 @@ export default function HomeScreen() {
   };
 
   const handleResetRoute = () => {
+    setImmersiveMode(false); // <--- DISATTIVA IMMERSIVE MODE
     setIsNavigating(false);
+    NavigationStore.set({ isDemo: false }); // Reset Demo Flag
     setDemoCanStart(false);
     setRouteCoords([]);
     setCurrentInstruction(null);
@@ -426,8 +484,8 @@ export default function HomeScreen() {
     return () => { if(sub) sub.remove(); };
   }, []);
 
-  useNavigationUpdater(currentInstruction, setCurrentInstruction, callStatus);
-
+  // RIMOSSO: useNavigationUpdater (Logic moved to Background Service)
+  
   // 1. Assistente Vocale Navigation (TTS)
   useVoiceAssistant({
     instruction: currentInstruction,

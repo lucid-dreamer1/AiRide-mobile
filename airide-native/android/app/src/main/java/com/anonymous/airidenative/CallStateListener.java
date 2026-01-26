@@ -15,8 +15,10 @@ public class CallStateListener extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        android.util.Log.d("CallStateListener", "onReceive triggered with action: " + intent.getAction());
         if (intent.getAction().equals(TelephonyManager.ACTION_PHONE_STATE_CHANGED)) {
             String state = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
+            android.util.Log.d("CallStateListener", "Phone State Changed to: " + state);
             
             String eventName = "CallStatusChanged";
             // 0: Idle, 1: Ringing, 2: Offhook (Accepted/Dialing)

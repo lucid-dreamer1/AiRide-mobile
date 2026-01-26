@@ -41,28 +41,26 @@ const CallModule = {
 
   makeCall: async (phoneNumber) => {
     if (Platform.OS === 'android') {
-        const hasPermissions = await CallModule.requestPermissions();
-        if (hasPermissions) {
-             AiRideCallModule.makeCall(phoneNumber);
-        }
+        // Request permissions but don't block if something fails silently in JS check
+        await CallModule.requestPermissions();
+        console.log("[CallModule] Calling Native makeCall...");
+        AiRideCallModule.makeCall(phoneNumber);
     }
   },
 
   answerCall: async () => {
     if (Platform.OS === 'android') {
-        const hasPermissions = await CallModule.requestPermissions();
-        if (hasPermissions) {
-             AiRideCallModule.answerCall();
-        }
+        await CallModule.requestPermissions();
+        console.log("[CallModule] Calling Native answerCall...");
+        AiRideCallModule.answerCall();
     }
   },
 
   hangUp: async () => {
     if (Platform.OS === 'android') {
-        const hasPermissions = await CallModule.requestPermissions();
-        if (hasPermissions) {
-             AiRideCallModule.hangUp();
-        }
+        await CallModule.requestPermissions();
+        console.log("[CallModule] Calling Native hangUp...");
+        AiRideCallModule.hangUp();
     }
   },
 
