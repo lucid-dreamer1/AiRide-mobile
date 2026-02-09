@@ -17,7 +17,7 @@ import { bleService } from "../services/BleSingleton";
 // const manager = new BleManager(); // Rimosso: usa Singleton
 
 // 🟦 ATTIVA/DISATTIVA MOCK
-const MOCK_BLE = false;
+const MOCK_BLE = true;
 
 type HelmetContextType = {
   device: Device | null;

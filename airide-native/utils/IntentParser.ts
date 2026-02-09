@@ -7,6 +7,9 @@ export type VoiceIntent =
   | { type: 'CALL_CONTACT'; contactName: string }
   | { type: 'ANSWER_CALL' }
   | { type: 'HANG_UP' }
+  | { type: 'GET_TIME' }
+  | { type: 'GET_REMAINING_INFO' }
+  | { type: 'CHECK_NOTIFICATIONS' }
   | { type: 'UNKNOWN'; rawText: string };
 
 export class IntentParser {
@@ -17,7 +20,12 @@ export class IntentParser {
   private avoidHighwaysRegex = /evita autostrade/i;
   private cancelRegex = /(annulla|elimina|cancella|termina|stop)\s+(la\s+)?(navigazione|rotta|rutta|percorso|viaggio)/i;
   private backRegex = /torna alla rotta precedente/i;
-  private wakeWordRegex = /\b(hey|ehi|ei|eh|hai|ok|ciao|e|è|i|il|el|al|un|a)(\s+(il|i|lo|l|un))?\s+casco\b/i;
+  private wakeWordRegex = /\b(hey|ehy|ehi|hei|ei|eh|hai|ok|ciao|e|è|i|il|el|al|un|a)(\s+(il|i|lo|l|un))?\s+casco\b/i;
+
+  // New Regexes
+  private timeRegex = /(che\s+(ore|ora)\s+(sono|è)|orario)/i;
+  private remainingRegex = /(quanto\s+manca|tempo\s+rimanente|distanza\s+rimanente)/i;
+  private notificationRegex = /(ho\s+notifiche|leggi\s+notifiche|controlla\s+notifiche)/i;
 
   // --- MAPPA PAROLE -> NUMERI ---
   // Vosk trascrive spesso i numeri civici in lettere. Li convertiamo per la regex.
@@ -97,12 +105,24 @@ export class IntentParser {
 
     let commandText = cleanText;
     if (hasWakeWord) {
-        commandText = cleanText.replace(this.wakeWordRegex, '').trim();
+        // Miglioramento: scarta tutto ciò che c'è prima della wake word
+        const match = cleanText.match(this.wakeWordRegex);
+        if (match && match.index !== undefined) {
+             commandText = cleanText.substring(match.index + match[0].length).trim();
+        } else {
+             // Fallback classico (non dovrebbe succedere se hasWakeWord=true)
+             commandText = cleanText.replace(this.wakeWordRegex, '').trim();
+        }
     }
 
     if (commandText.length === 0 && hasWakeWord) {
         return { type: 'UNKNOWN', rawText: text };
     }
+
+    // Info
+    if (this.timeRegex.test(commandText)) return { type: 'GET_TIME' };
+    if (this.remainingRegex.test(commandText)) return { type: 'GET_REMAINING_INFO' };
+    if (this.notificationRegex.test(commandText)) return { type: 'CHECK_NOTIFICATIONS' };
 
     // Navigazione
     const navMatch = commandText.match(this.navRegex);

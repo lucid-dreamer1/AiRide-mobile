@@ -102,7 +102,14 @@ const navigationTask = async (taskDataArguments: any) => {
 
                 // 3. PREPARA DATI DAL STORE
                 const currentData = NavigationStore.get();
-                const packet = `${currentData.arrow}|${currentData.distance}|${currentData.callStatus}`;
+                
+                // Calcolo distanza percorsa
+                const total = currentData.totalDist ?? 0;
+                const remaining = currentData.remainingDist ?? 0;
+                const traveled = Math.max(0, total - remaining);
+
+                // Protocollo: freccia|metri turno|m totali|m percorsi|phone status
+                const packet = `${currentData.arrow}|${currentData.distance}|${total}|${traveled}|${currentData.callStatus}`;
 
                 console.log(`[Background] 🟢 BRAIN LOOP | Packet: ${packet}`);
 

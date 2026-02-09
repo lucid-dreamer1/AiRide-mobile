@@ -44,6 +44,8 @@ import { BackgroundNavigation } from "../../services/BackgroundNavigation";
 import CallModule from "@/services/callModule"; 
 import * as Contacts from 'expo-contacts'; 
 import { NavigationStore } from "@/services/NavigationStore"; // <--- Import Store
+import { ttsService } from "@/services/TTSService";
+import { VoicePriority } from "@/types/voice";
 
 const DEMO_MODE = true;
 
@@ -509,7 +511,35 @@ export default function HomeScreen() {
           BackgroundNavigation.start();
           setIsNavigating(true); // Aggiorna anche stato UI
           break;
-        case 'CANCEL_NAVIGATION':
+        case 'GET_TIME':
+            console.log('[HomeScreen] Eseguo GET_TIME');
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            setTimeout(() => {
+                ttsService.speak(`Sono le ${timeString}`, VoicePriority.HIGH);
+            }, 500);
+            break;
+
+        case 'GET_REMAINING_INFO':
+            console.log('[HomeScreen] Eseguo GET_REMAINING_INFO');
+            if (isNavigating && routeInfo.duration && routeInfo.distance) {
+                setTimeout(() => {
+                    ttsService.speak(`Mancano ${routeInfo.distance} e circa ${routeInfo.duration}`, VoicePriority.HIGH);
+                }, 500);
+            } else {
+                setTimeout(() => {
+                  ttsService.speak("Non c'è nessuna navigazione attiva.", VoicePriority.HIGH);
+                }, 500);
+            }
+            break;
+
+        case 'CHECK_NOTIFICATIONS':
+             console.log('[HomeScreen] Eseguo CHECK_NOTIFICATIONS');
+            // TODO: Integrare con un vero NotificationListener
+            setTimeout(() => {
+                ttsService.speak("Al momento non hai nuove notifiche.", VoicePriority.HIGH);
+            }, 500);
+            break;         case 'CANCEL_NAVIGATION':
           handleResetRoute();
           BackgroundNavigation.stop(); // Stop anche da voce
           break;

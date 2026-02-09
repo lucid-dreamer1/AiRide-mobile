@@ -16,7 +16,7 @@ import { IntentParser, VoiceIntent } from '../utils/IntentParser';
 // (hey|ehi...|al) -> tutte le varianti fonetiche del saluto o articoli che suonano simili
 // (\s+(il|i|lo|l|un))? -> cattura opzionalmente articoli spuri (es. "e il casco")
 // \s+casco -> la parola chiave finale
-const WAKE_WORD_REGEX = /\b(hey|ehi|ei|eh|hai|ok|ciao|e|è|i|il|el|al|un|a)(\s+(il|i|lo|l|un))?\s+casco\b/i;
+const WAKE_WORD_REGEX = /\b(hey|ehy|ehi|hei|ei|eh|hai|ok|ciao|e|è|i|il|el|al|un|a)(\s+(il|i|lo|l|un))?\s+casco\b/i;
 
 interface UseVoiceCommandProps {
   enabled: boolean;
@@ -84,7 +84,8 @@ export function useVoiceCommand({
       try {
         stop();
         await new Promise(r => setTimeout(r, 200));
-      } catch (e) {}
+      } catch (e) { // ignore
+      }
 
       console.log('[VoiceCommand] Avvio ascolto...');
       isVoskActiveRef.current = true;
@@ -132,7 +133,8 @@ export function useVoiceCommand({
         if (text) {
           checkWakeWord(text);
         }
-      } catch(e) {}
+      } catch(e) { // ignore
+      }
     });
 
     const resultSub = onResult((res) => {
@@ -148,9 +150,20 @@ export function useVoiceCommand({
           const isWithinWindow = (Date.now() - lastWakeWordTime.current) < WAKE_WORD_WINDOW;
 
           if (isWithinWindow || justWokeUp) {
-            // CRUCIALE: Usiamo la STESSA regex per pulire la frase
-            // Rimuove "e il casco", "hey casco", "el casco" ecc. dalla stringa
-            const cleanText = text.replace(WAKE_WORD_REGEX, '').trim();
+            // CRUCIALE: Logica migliorata per prendere solo ciò che segue la wake word
+            // Se c'è la wake word, scartiamo tutto il testo precedente (rumore, folla, ecc.)
+            let cleanText = text;
+            const match = text.match(WAKE_WORD_REGEX);
+            
+            if (match && match.index !== undefined) {
+               // Prendi tutto ciò che c'è dopo la fine del match
+               cleanText = text.substring(match.index + match[0].length).trim();
+            } else {
+               // Se siamo qui, o `justWokeUp` è false (quindi usiamo `isWithinWindow`), 
+               // oppure la regex ha fallito (impossibile se justWokeUp=true).
+               // Se `isWithinWindow` è true e non c'è wake word, assumiamo che tutto il testo sia il comando.
+               cleanText = text.trim();
+            }
             
             console.log(`🧹 Testo pulito per parser: "${cleanText}"`);
 

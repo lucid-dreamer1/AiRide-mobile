@@ -86,31 +86,18 @@ class TTSService {
       this.speaking = true;
       this.currentMessage = message;
 
-      const mergedOptions = { ...this.defaultOptions, ...options };
+    const mergedOptions = { ...this.defaultOptions, ...options };
 
-      console.log(`[TTS] 🔊 Speaking: "${message.text}"`);
-      console.log(`[TTS] 📋 Options: Priority=${message.priority}, Language=${mergedOptions.language}`);
+      console.log(`[TTS] 🔊 Speaking: "${message.text}"`); 
 
       // Determina la voce corretta per la lingua
       try {
         const voices = await Speech.getAvailableVoicesAsync();
-        console.log(`[TTS] 🎤 Voci disponibili: ${voices.length}`);
-        
-        // Mostra tutte le voci per debug
-        voices.forEach(v => {
-          console.log(`[TTS]   - ${v.name} (${v.language}) [${v.quality}]`);
-        });
         
         const languageCode = mergedOptions.language?.split('-')[0] || 'it'; // es: 'it-IT' -> 'it'
-        console.log(`[TTS] 🔍 Cercando voce per lingua: ${languageCode}`);
         
         // Trova TUTTE le voci disponibili per la lingua richiesta
         const matchingVoices = voices.filter(v => v.language.toLowerCase().startsWith(languageCode.toLowerCase()));
-        
-        console.log(`[TTS] 📢 Voci trovate per ${languageCode}: ${matchingVoices.length}`);
-        matchingVoices.forEach(v => {
-          console.log(`[TTS]   ✓ ${v.name} (${v.language}) [${v.quality}]`);
-        });
         
         // Preferisci voci di qualità alta se disponibili
         const selectedVoice = matchingVoices.find(v => v.quality === 'Enhanced') 
@@ -118,8 +105,7 @@ class TTSService {
                            || matchingVoices[0];
         
         if (selectedVoice) {
-          console.log(`[TTS] ✅ Voce selezionata: ${selectedVoice.name} (${selectedVoice.language}) [${selectedVoice.quality}]`);
-          console.log(`[TTS] 🆔 Voice ID: ${selectedVoice.identifier}`);
+          console.log(`[TTS] ✅ Voce selezionata: ${selectedVoice.name} (${selectedVoice.language})`);
           
           await Speech.speak(message.text, {
             language: selectedVoice.language, // USA LA LINGUA DELLA VOCE SELEZIONATA
