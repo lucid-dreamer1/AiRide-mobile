@@ -4,13 +4,14 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  // ScrollView, // <-- REMOVED
+  FlatList, // <-- ADDED
   TouchableOpacity,
   Animated,
   Alert,
 } from "react-native";
 
-import MapView, { Polyline } from "react-native-maps";
+import MapView, { Polyline, PROVIDER_GOOGLE } from "react-native-maps"; // Added PROVIDER_GOOGLE just in case
 
 import { firebaseFirestore } from "@/services/firebaseConfig";
 import { useAuth } from "@/services/useAuth";
@@ -109,8 +110,80 @@ export default function RidesScreen() {
 
   const styles = createStyles(themeColors);
 
+  const renderItem = ({ item }: { item: any }) => {
+    const safePolyline =
+      item.polyline?.map((p: any) => ({
+        latitude: p.lat ?? p.latitude,
+        longitude: p.lon ?? p.longitude,
+      })) ?? [];
+
+    if (!opacityRefs.current[item.id]) {
+        opacityRefs.current[item.id] = new Animated.Value(1);
+    }
+
+    return (
+      <Swipeable key={item.id} renderRightActions={() => renderRightActions(item)}>
+        <Animated.View style={{ opacity: opacityRefs.current[item.id] }}>
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Feather name="map-pin" size={20} color={themeColors.accent} />
+              <Text style={styles.dest}>{item.destination}</Text>
+
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={() => confirmDelete(item.id, item.destination)}
+              >
+                <Feather name="trash-2" size={20} color={themeColors.accent} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.mapWrapper}>
+              <MapView
+                style={styles.map}
+                provider={PROVIDER_GOOGLE}
+                liteMode={true} // <--- CRITICAL FIX FOR OOM
+                scrollEnabled={false}
+                zoomEnabled={false}
+                initialRegion={{
+                  latitude: safePolyline[0]?.latitude ?? 0,
+                  longitude: safePolyline[0]?.longitude ?? 0,
+                  latitudeDelta: 0.02,
+                  longitudeDelta: 0.02,
+                }}
+              >
+                <Polyline
+                  coordinates={safePolyline}
+                  strokeWidth={4}
+                  strokeColor={themeColors.accent}
+                />
+              </MapView>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.info}>{item.distanceKm} km</Text>
+              <Text style={styles.info}>{item.durationMin} min</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.replayButton}
+              onPress={() =>
+                router.push({
+                  pathname: "/",
+                  params: { destination: item.destination },
+                })
+              }
+            >
+              <Feather name="rotate-cw" size={18} color="white" />
+              <Text style={styles.replayText}>Ripercorri</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Swipeable>
+    );
+  };
+
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
       <Text style={styles.title}>Rides</Text>
 
       {/* EMPTY STATE */}
@@ -135,73 +208,19 @@ export default function RidesScreen() {
         </Animated.View>
       )}
 
-      {/* LISTA ROTTE */}
-      {rides.map((ride) => {
-        const safePolyline =
-          ride.polyline?.map((p: any) => ({
-            latitude: p.lat ?? p.latitude,
-            longitude: p.lon ?? p.longitude,
-          })) ?? [];
-
-        return (
-          <Swipeable key={ride.id} renderRightActions={() => renderRightActions(ride)}>
-            <Animated.View style={{ opacity: opacityRefs.current[ride.id] }}>
-              <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <Feather name="map-pin" size={20} color={themeColors.accent} />
-                  <Text style={styles.dest}>{ride.destination}</Text>
-
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
-                    onPress={() => confirmDelete(ride.id, ride.destination)}
-                  >
-                    <Feather name="trash-2" size={20} color={themeColors.accent} />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.mapWrapper}>
-                  <MapView
-                    style={styles.map}
-                    scrollEnabled={false}
-                    zoomEnabled={false}
-                    initialRegion={{
-                      latitude: safePolyline[0]?.latitude ?? 0,
-                      longitude: safePolyline[0]?.longitude ?? 0,
-                      latitudeDelta: 0.02,
-                      longitudeDelta: 0.02,
-                    }}
-                  >
-                    <Polyline
-                      coordinates={safePolyline}
-                      strokeWidth={4}
-                      strokeColor={themeColors.accent}
-                    />
-                  </MapView>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <Text style={styles.info}>{ride.distanceKm} km</Text>
-                  <Text style={styles.info}>{ride.durationMin} min</Text>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.replayButton}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/",
-                      params: { destination: ride.destination },
-                    })
-                  }
-                >
-                  <Feather name="rotate-cw" size={18} color="white" />
-                  <Text style={styles.replayText}>Ripercorri</Text>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-          </Swipeable>
-        );
-      })}
-    </ScrollView>
+      {/* LISTA ROTTE (FlatList per performance) */}
+      <FlatList 
+        data={rides}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true} // Unmount offscreen views
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
+        windowSize={5}
+      />
+    </View>
   );
 }
 

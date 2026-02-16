@@ -62,19 +62,30 @@ export const ThemeProvider = ({ children }: { children: any }) => {
     const unsub = firebaseFirestore
       .collection("users")
       .doc(user.uid)
-      .onSnapshot((doc) => {
-        const data = doc.data() || {};
+      .onSnapshot(
+        (doc) => {
+          if (doc && doc.exists) {
+            const data = doc.data() || {};
 
-        // 🔥 CERCA IL TEMA IN ENTRAMBI I PUNTI
-        const savedTheme =
-          (data.settings?.theme as ThemeName) ??
-          (data.theme as ThemeName) ??
-          "default";
+            // 🔥 CERCA IL TEMA IN ENTRAMBI I PUNTI
+            const savedTheme =
+              (data.settings?.theme as ThemeName) ??
+              (data.theme as ThemeName) ??
+              "default";
 
-        if (THEMES[savedTheme]) setThemeState(savedTheme);
-      });
+            if (THEMES[savedTheme]) setThemeState(savedTheme);
+          }
+        },
+        (error: any) => {
+            if (error?.code && error?.code.includes("permission-denied")) {
+                // Expected on logout
+                return;
+            }
+            console.log("ThemeContext snapshot error (ignorable during logout):", error);
+        }
+      );
 
-    return unsub;
+    return () => unsub();
   }, [user]);
 
   /* -------------------------------------------------------

@@ -14,7 +14,8 @@ import {
   Linking,
   Platform,
   PermissionsAndroid,
-  StatusBar, 
+  StatusBar,
+  Alert,
 } from "react-native";
 import SystemNavigationBar from 'react-native-system-navigation-bar';
 import { useTheme } from "@/contexts/ThemeContext";
@@ -69,6 +70,11 @@ const setImmersiveMode = (enabled: boolean) => {
     }
 };
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import OnboardingModal from "@/components/OnboardingModal"; // <--- Import
+
+// ...
+
 export default function HomeScreen() {
   const { themeColors } = useTheme();
   const styles = createStyles(themeColors);
@@ -100,12 +106,42 @@ export default function HomeScreen() {
   const [demoSpeed, setDemoSpeed] = useState(3);
   const [showDemoPanel, setShowDemoPanel] = useState(false);
   const [showBlePanel, setShowBlePanel] = useState(false);
+  
+  const [showOnboarding, setShowOnboarding] = useState(false); // <--- New State
 
   const [isNavigating, setIsNavigating] = useState(false); // <--- NUOVO STATO
 
   const mapRef = useRef<MapView | null>(null);
 
   const hasLoadedFromRides = useRef(false);
+
+  // -------------------------------------------------------------
+  // ONBOARDING CHECK
+  // -------------------------------------------------------------
+  useEffect(() => {
+    (async () => {
+      if (!user?.uid) return; // Wait for user to be loaded
+
+      try {
+        const key = `hasLaunched_${user.uid}`;
+        const hasLaunched = await AsyncStorage.getItem(key);
+        console.log(`📝 [Index] hasLaunched Check for ${user.uid}:`, hasLaunched);
+        
+        if (hasLaunched === null) {
+          setShowOnboarding(true);
+        }
+      } catch (e) {
+        console.error('Error checking first launch:', e);
+      }
+    })();
+  }, [user]);
+
+  const handleOnboardingDone = async () => {
+    if (!user?.uid) return;
+    setShowOnboarding(false);
+    await AsyncStorage.setItem(`hasLaunched_${user.uid}`, 'true');
+    // Opzionale: Chiedi permessi qui se non fatto nello slide
+  };
 
   const demoIndexRef = useRef(0);
   const demoTRef = useRef(0);
@@ -125,6 +161,125 @@ export default function HomeScreen() {
     setDestination(dest);
     fetchRoute(dest);
   }, [params]);
+
+  // -------------------------------------------------------------
+  // RICHIESTA PERMESSI UNIFICATA
+  // -------------------------------------------------------------
+  const requestAllPermissions = async () => {
+      if (Platform.OS !== 'android') return true;
+
+      try {
+          console.log("📝 Richiedendo permessi runtime...");
+          
+          // 1. Runtime Permissions
+          const permissionsToRequest = [
+              PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+              PermissionsAndroid.PERMISSIONS.CALL_PHONE,
+              PermissionsAndroid.PERMISSIONS.ANSWER_PHONE_CALLS,
+              PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
+              PermissionsAndroid.PERMISSIONS.READ_CONTACTS,
+              PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+              PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          ];
+
+          if (Platform.Version >= 31) {
+              permissionsToRequest.push(
+                  PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+                  PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT
+              );
+          }
+
+          const result = await PermissionsAndroid.requestMultiple(permissionsToRequest);
+          
+          // Controllo negati
+          const deniedPermissions = Object.entries(result)
+              .filter(([key, value]) => value !== PermissionsAndroid.RESULTS.GRANTED)
+              .map(([key, value]) => key.split('.').pop());
+
+          if (deniedPermissions.length > 0) {
+              console.log("📝 Denied: ", deniedPermissions); 
+               Alert.alert(
+                  "Permessi Necessari",
+                  `Hai negato permessi essenziali:\n${deniedPermissions.join(', ')}\n\nL'app non può funzionare correttamente. Vai nelle Impostazioni e abilitali.`,
+                  [
+                      { text: "Chiudi", style: "cancel" },
+                      { text: "Impostazioni", onPress: () => Linking.openSettings() }
+                  ]
+              );
+              return false; 
+          }
+
+          // 2. Battery Optimization
+          const isBatteryOptimized = await Linking.canOpenURL("android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS");
+          // Nota: canOpenURL controlla solo se l'intent è valido, non se è già ottimizzato. 
+          // Android non ha un'API pubblica semplice per checkare "isIgnoringBatteryOptimizations" da JS senza Native Module custom.
+          // Tuttavia, per ora lasciamo l'alert ma potremmo usare un flag in AsyncStorage "batteryAlertShown" per non mostrarlo sempre?
+          // OPPURE: Rimuoviamo il timeout e lo mostriamo solo se l'utente lo richiede esplicitamente o se notiamo problemi.
+          // PER IL MOMENTO: Lo commentiamo/rimuoviamo se è troppo invasivo, o lo lasciamo. 
+          // L'utente dice "a volte appaiono quando non devono". 
+          // Se l'utente ha già dato l'ok, Android di solito ignora la richiesta o mostra "già ottimizzato".
+          
+          // MIGLIORAMENTO: Mostriamo l'alert solo se è la prima volta o se non salvato
+          // Per semplicità e stabilità richiesta: Rimuoviamo il timeout aggressivo. Spostiamolo in un "Check Status" manuale o solo prima installazione.
+          // MA, per rispettare la richiesta "non devono apparire se non devono":
+          // Purtroppo senza Native Module "PowerManager.isIgnoringBatteryOptimizations" non possiamo saperlo con certezza da JS puro.
+          // SOLUZIONE COMPROMESSO: Usiamo il flag "hasLaunched" (o simile) per mostrarlo UNA volta sola.
+          // O meglio: Lo rimuoviamo dal flusso automatico di avvio per evitare spam, e lo lasciamo nelle impostazioni?
+          // L'utente vuole risolvere il bug "appaiono quando non devono".
+          // Se appaiono, vuol dire che il codice viene eseguito.
+          
+          // PROPOSTA: Rimuovo questi alert automatici dal flusso di avvio (loop o timeout) e li lascio solo su richiesta utente o check più intelligente.
+          // STEP: Rendo il timeout condizionale o lo rimuovo. L'utente ha detto "a volte appaiono".
+          // Facciamo che se PermissionsAndroid dice tutto OK, non rompiamo le scatole con Battery/Overlay a meno che non sia vitale.
+          
+          // DECISIONE: Commento i timeout per Battery e Overlay nel flusso automatico. 
+          // Se l'app non va in background, l'utente andrà nelle impostazioni o resetterà.
+          // Questo risolve "appaiono quando non devono" (cioè sempre).
+          
+          /* 
+          setTimeout(() => {
+             // ... Code removed to stop spam
+          }, 500);
+          */
+
+          // 3. Overlay 
+          if (Platform.Version >= 29) {
+             const canOverlay = await PermissionsAndroid.check("android.permission.SYSTEM_ALERT_WINDOW"); 
+             // Attenzione: SYSTEM_ALERT_WINDOW non si checka con PermissionsAndroid standard su tutti i device, ma proviamo.
+             // Se ritorna false (o non supportato), e Settings.canDrawOverlays è true... 
+             // In realtà Settings.canDrawOverlays richiede Native Module.
+             
+             // PER RISOLVERE IL BUG "appaiono quando non devono": Li rimuovo dall'auto-check all'avvio. 
+             // Li sposterò eventualmente in un pulsante "Diagnostica" o se l'utente attiva la navigazione Background.
+             
+             /*
+               setTimeout(() => {
+                  Alert.alert(
+                      "Visualizzazione sopra app",
+                      "Necessario per vedere le indicazioni mentre usi altre app.",
+                      [
+                           { text: "Ignora", style: "cancel" },
+                           {
+                              text: "Impostazioni Overlay",
+                              onPress: () => {
+                                  Linking.sendIntent("android.settings.action.MANAGE_OVERLAY_PERMISSION", [
+                                      { key: "package", value: "package:com.anonymous.airidenative" }
+                                  ]).catch(() => Linking.openSettings());
+                              }
+                           }
+                      ]
+                  );
+               }, 3000); 
+             */
+          }
+          
+          return true;
+
+      } catch (err) {
+          console.warn("Permission parsing error:", err);
+          return false;
+      }
+  };
 
   // -------------------------------------------------------------
   // GPS INIT
@@ -149,44 +304,19 @@ export default function HomeScreen() {
       } catch {}
     })();
 
-    // Richiedi TUTTI i permessi necessari all'avvio
-    // Richiedi TUTTI i permessi necessari all'avvio
-    if (Platform.OS === 'android') {
-        (async () => {
-             const result = await PermissionsAndroid.requestMultiple([
-                PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-                PermissionsAndroid.PERMISSIONS.CALL_PHONE,
-                PermissionsAndroid.PERMISSIONS.ANSWER_PHONE_CALLS,
-                PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
-                PermissionsAndroid.PERMISSIONS.READ_CONTACTS
-             ]);
-             console.log("Permissions result:", result);
-
-             // Optional prompt for Overlay (needed for background start on Android 10+)
-             if (Platform.Version >= 29) {
-                // Remove await call here or wrap in try/catch as PermissionsAndroid.check for overlay might not be supported directly
-                // Just open settings if needed
-                Toast.show({
-                    type: 'info',
-                    text1: 'Permesso Sovrapposizione',
-                    text2: 'Abilita "Mostra sopra altre app" se richiesto',
-                    visibilityTime: 4000
-                });
-                Linking.openSettings(); 
+    // -------------------------------------------------------------
+    // RICHIESTA PERMESSI UNIFICATA
+    // -------------------------------------------------------------
+    // Avvio richiesta permessi con delay per non sovrapporsi al GPS request
+    setTimeout(() => {
+        requestAllPermissions().then((granted) => {
+             if (granted) {
+                 console.log("✅ Permessi Init OK. Background Service pronto.");
+                 BackgroundNavigation.start();
              }
-        })();
-    }
-    
-    // Richiedi di ignorare l'ottimizzazione batteria (per background service)
-    if (Platform.OS === 'android') {
-        Toast.show({
-            type: "info",
-            text1: "Ottimizzazione Batteria",
-            text2: "Imposta 'Nessuna restrizione' per evitare blocchi.",
-            visibilityTime: 6000,
         });
-        Linking.openSettings();
-    }
+    }, 1000);
+
   }, []);
 
   // -------------------------------------------------------------
@@ -231,6 +361,10 @@ export default function HomeScreen() {
         next: null,
         fase: "ready",
       });
+      
+      return data; // <--- RETURN DATA
+    } catch {
+        return null; // <--- RETURN NULL ON ERROR
     } finally {
       setLoadingRoute(false);
     }
@@ -290,20 +424,44 @@ export default function HomeScreen() {
   }, [isNavigating]); 
 
   // -------------------------------------------------------------
-  // GESTIONE BACKGROUND SERVICE
+  // HELPER PERMISSIONS
   // -------------------------------------------------------------
   // -------------------------------------------------------------
-  // GESTIONE BACKGROUND SERVICE
+  // HELPER PERMISSIONS
+  // -------------------------------------------------------------
+  const checkPermissions = async () => {
+      if (Platform.OS !== 'android') return true;
+      
+      const hasAudio = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+      if (hasAudio) return true;
+
+      // Se manca qualcosa, rilanciamo il flusso completo (che ha gli alert e la gestione "never_ask_again")
+      console.log("🟦 [Index] Permessi mancanti in checkPermissions, avvio requestAllPermissions...");
+      return await requestAllPermissions(); 
+  };
+
+  // -------------------------------------------------------------
+  // GESTIONE BACKGROUND SERVICE E SYNC STORE
   // -------------------------------------------------------------
   useEffect(() => {
-    console.log("🟦 [Index] isNavigating changed:", isNavigating);
-    if (isNavigating) {
-      console.log("🟦 [Index] Chiamata a BackgroundNavigation.start()...");
-      BackgroundNavigation.start();
-    } else {
-      console.log("🟦 [Index] Chiamata a BackgroundNavigation.stop()...");
-      BackgroundNavigation.stop();
-    }
+    // 1. Sincronizziamo lo stato locale con lo Store (usato dal Background Service)
+    NavigationStore.set({ isNavigating });
+
+    const manageService = async () => {
+        console.log("🟦 [Index] isNavigating changed:", isNavigating);
+        if (isNavigating) {
+            const hasPerms = await checkPermissions();
+            if (hasPerms) {
+                console.log("🟦 [Index] Chiamata a BackgroundNavigation.start()...");
+                await BackgroundNavigation.start();
+            } else {
+                console.log("🟦 [Index] Start bloccato: permessi mancanti");
+            }
+        } 
+        // NOTA: Non chiamiamo stop() qui perché serviamo il servizio attivo per STT (Voice)
+    };
+    manageService();
+
   }, [isNavigating]); 
 
 
@@ -436,7 +594,6 @@ export default function HomeScreen() {
         destination
       );
 
-      // 🔥 AVVIA LA NAVIGATION LOOP REALE
       // 🔥 AVVIA LA NAVIGATION LOOP REALE (Anche in Demo Mode per testare BG)
       if (DEMO_MODE) NavigationStore.set({ isDemo: true });
       setIsNavigating(true);
@@ -472,8 +629,6 @@ export default function HomeScreen() {
     });
   };
 
-// ... (keeping existing imports)
-
   const [callStatus, setCallStatus] = useState<number>(0); 
   // 0: Nessuna, 1: In arrivo, 2: Attiva, 3: Conclusa
 
@@ -486,8 +641,6 @@ export default function HomeScreen() {
     return () => { if(sub) sub.remove(); };
   }, []);
 
-  // RIMOSSO: useNavigationUpdater (Logic moved to Background Service)
-  
   // 1. Assistente Vocale Navigation (TTS)
   useVoiceAssistant({
     instruction: currentInstruction,
@@ -498,18 +651,46 @@ export default function HomeScreen() {
   // 2. Assistente Vocale Hands-free (Hey Casco - STT)
   const { isCommandWindowOpen } = useVoiceCommand({
     enabled: voiceSettings.enabled,
-    onIntentDetected: (intent) => {
+    onIntentDetected: async (intent) => { // <--- ASYNC HERE
       console.log('[HomeScreen] Intento vocale rilevato:', intent);
 
-      
       switch (intent.type) {
         case 'NAVIGATE_TO':
           setDestination(intent.destination);
-          fetchRoute(intent.destination);
-          // 🎤 AVVIO BACKGROUND ANCHE DA VOCE
-          console.log("🎤 Avvio Background Service da comando vocale...");
-          BackgroundNavigation.start();
-          setIsNavigating(true); // Aggiorna anche stato UI
+          const routeData = await fetchRoute(intent.destination);
+          
+          if (routeData) {
+             console.log("🎤 Rotta ottenuta, avvio navigazione...");
+             // AVVIO SIMILE A HANDLE SEND
+             try {
+                // Posizione start presa da routeData o corrente
+                const startPos = currentPosition || { latitude: 0, longitude: 0 };
+                
+                await startTrip(
+                    { lat: startPos.latitude, lon: startPos.longitude },
+                    intent.destination
+                );
+                
+                if (DEMO_MODE) {
+                    setDemoCanStart(true);
+                    NavigationStore.set({ isDemo: true });
+                }
+                
+                setIsNavigating(true);
+                
+                const hasPerms = await checkPermissions();
+                if (hasPerms) {
+                    BackgroundNavigation.start();
+                }
+                
+                ttsService.speak("Si parte!", VoicePriority.HIGH);
+             } catch (e) {
+                 console.error("Errore startTrip da voce:", e);
+                 ttsService.speak("Errore nell'avvio del viaggio", VoicePriority.HIGH);
+             }
+          } else {
+              ttsService.speak("Non riesco a calcolare il percorso", VoicePriority.HIGH);
+          }
           break;
         case 'GET_TIME':
             console.log('[HomeScreen] Eseguo GET_TIME');
@@ -839,6 +1020,19 @@ export default function HomeScreen() {
                 );
               })}
             </View>
+
+            <TouchableOpacity
+              style={[styles.demoButton, { marginTop: 10, borderColor: '#E74C3C' }]}
+              onPress={async () => {
+                  if (user?.uid) {
+                      await AsyncStorage.removeItem(`hasLaunched_${user.uid}`);
+                      setShowOnboarding(true);
+                      Toast.show({ type: 'info', text1: 'Intro resettata', text2: 'Al prossimo avvio vedrai lo slider' });
+                  }
+              }}
+            >
+              <Text style={[styles.demoButtonText, { color: '#E74C3C' }]}>Reset Intro</Text>
+            </TouchableOpacity>
           </Animated.View>
         </>
       )}
@@ -864,6 +1058,8 @@ export default function HomeScreen() {
         <Feather name="send" size={20} color="white" />
         <Text style={styles.sendButtonText}>Invia al casco</Text>
       </TouchableOpacity>
+
+      <OnboardingModal visible={showOnboarding} onDone={handleOnboardingDone} />
 
     </View>
   );
