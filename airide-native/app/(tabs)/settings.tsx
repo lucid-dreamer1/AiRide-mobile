@@ -16,6 +16,11 @@ import firestore from "@react-native-firebase/firestore";
 import { useAuth } from "@/services/useAuth";
 import Feather from "@expo/vector-icons/Feather";
 import { REWARDS } from "@/constants/achievements";
+import * as DocumentPicker from "expo-document-picker";
+import Toast from "react-native-toast-message";
+import { NavigationStore } from "@/services/NavigationStore";
+import Slider from '@react-native-community/slider';
+import { Audio } from 'expo-av';
 
 // Abilita animazioni su Android
 if (Platform.OS === "android") {
@@ -30,8 +35,13 @@ export default function SettingsScreen() {
     hudPlus: false,
     proMode: false,
     introAnim: false,
+    riskSongUri: null,
+    riskSongStartTime: 0,
   });
 
+  const [localStartTime, setLocalStartTime] = useState<number>(0);
+  const [audioDuration, setAudioDuration] = useState<number>(300); // default in sec
+  
   const [availableRewards, setAvailableRewards] = useState<string[]>([]);
 
   const [openSections, setOpenSections] = useState({
@@ -58,11 +68,54 @@ export default function SettingsScreen() {
           hudPlus: data.settings?.hudPlus ?? false,
           proMode: data.settings?.proMode ?? false,
           introAnim: data.settings?.introAnim ?? false,
+          riskSongUri: data.settings?.riskSongUri ?? null,
+          riskSongStartTime: data.settings?.riskSongStartTime ?? 0,
         });
+
+        // Sincronizziamo subito la canzone con il Background Store così se la cambi funziona al volo
+        if (data.settings?.riskSongUri) {
+          NavigationStore.set({ 
+             riskSongUri: data.settings.riskSongUri,
+             riskSongStartTime: data.settings.riskSongStartTime ?? 0,
+          });
+        }
       });
 
     return unsub;
   }, [user]);
+
+  // Sync state per slider
+  useEffect(() => {
+    setLocalStartTime(settings.riskSongStartTime || 0);
+  }, [settings.riskSongStartTime]);
+
+  // Carica durata audio per lo slider
+  useEffect(() => {
+    if (settings.riskSongUri) {
+       Audio.Sound.createAsync({ uri: settings.riskSongUri }).then(({ sound, status }) => {
+           if (status.isLoaded && status.durationMillis) {
+               setAudioDuration(status.durationMillis / 1000);
+           }
+           sound.unloadAsync();
+       }).catch(() => {});
+    }
+  }, [settings.riskSongUri]);
+
+  const playPreview = async (startTimeSec: number) => {
+     try {
+         const { sound } = await Audio.Sound.createAsync({ uri: settings.riskSongUri });
+         await sound.playFromPositionAsync(startTimeSec * 1000);
+         setTimeout(() => {
+             sound.stopAsync().then(() => sound.unloadAsync());
+         }, 4000); // 4 secondi per capire il ritornello
+     } catch(e) {}
+  };
+
+  const handleSlidingComplete = (val: number) => {
+      const intVal = Math.floor(val);
+      updateSetting("riskSongStartTime", intVal);
+      playPreview(intVal);
+  };
 
   const updateSetting = (key: string, value: any) => {
     if (!user) return;
@@ -81,6 +134,33 @@ export default function SettingsScreen() {
   };
 
   const hasReward = (reward: string) => availableRewards.includes(reward);
+
+  const handlePickRiskSong = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "audio/*",
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const fileUri = result.assets[0].uri;
+        // Salva direttamente in Firestore e nello stato locale
+        updateSetting("riskSongUri", fileUri);
+        Toast.show({
+          type: "success",
+          text1: "Risk Song Impostata",
+          text2: "Il tuo audio per i sorpassi è pronto!",
+        });
+      }
+    } catch (err) {
+      console.log("Errore caricamento audio Risk Song:", err);
+      Toast.show({
+        type: "error",
+        text1: "Errore file",
+        text2: "Impossibile caricare l'audio",
+      });
+    }
+  };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -200,6 +280,63 @@ export default function SettingsScreen() {
               value={settings.introAnim}
               onChange={(v: boolean) => updateSetting("introAnim", v)}
             />
+          )}
+
+          {/* Risk Song */}
+          {hasReward("risk-song") && (
+            <View style={[styles.switchContainer, { flexDirection: "column", alignItems: "stretch" }]}>
+              {/* Riga principale: Testo e Pulsante Carica */}
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.switchLabel}>{REWARDS["risk-song"].label}</Text>
+                  <Text style={styles.switchDesc}>
+                    {settings.riskSongUri 
+                      ? "Hai già impostato un audio. Clicca l'icona a lato per cambiarlo." 
+                      : REWARDS["risk-song"].description}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={handlePickRiskSong}
+                  style={[styles.testButton, { marginTop: 0, paddingVertical: 8, paddingHorizontal: 16 }]}
+                >
+                  <Feather name="music" size={18} color="white" />
+                  <Text style={styles.testButtonText}>
+                    {settings.riskSongUri ? "Modifica" : "Carica Audio"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Controlli aggiuntivi se l'audio è caricato */}
+              {settings.riskSongUri && (
+                <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderColor: "#333" }}>
+                  <Text style={[styles.switchLabel, { fontSize: 14 }]}>Trascina per scegliere l'inizio</Text>
+                  <Text style={[styles.switchDesc, { marginBottom: 10 }]}>Sposta il cursore per ascoltare l'anteprima e impostare il momento del sorpasso.</Text>
+                  
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={{ color: "white", width: 45, textAlign: "left", fontSize: 13 }}>
+                      {Math.floor(localStartTime / 60)}:{(localStartTime % 60).toString().padStart(2, "0")}
+                    </Text>
+                    
+                    <Slider
+                      style={{ flex: 1, height: 40 }}
+                      minimumValue={0}
+                      maximumValue={audioDuration}
+                      step={1}
+                      value={localStartTime}
+                      onValueChange={(val) => setLocalStartTime(val)}
+                      onSlidingComplete={handleSlidingComplete}
+                      minimumTrackTintColor="#E85A2A"
+                      maximumTrackTintColor="#555"
+                      thumbTintColor="#E85A2A"
+                    />
+                    
+                    <Text style={{ color: "#aaa", width: 45, textAlign: "right", fontSize: 13 }}>
+                      {Math.floor(audioDuration / 60)}:{(Math.floor(audioDuration) % 60).toString().padStart(2, "0")}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
           )}
 
         </View>

@@ -17,6 +17,7 @@ export const LEVELS: LevelDef[] = [
   { km: 150, title: "Bestia dell’Asfalto", reward: "hud-plus" },
   { km: 300, title: "Re delle Strade", reward: "pro-mode" },
   { km: 600, title: "Leggenda del Circuito", reward: "theme-premium" },
+  { km: 1000, title: "Maestro del Rischio", reward: "risk-song" },
 ];
 
 export const REWARDS: Record<
@@ -42,5 +43,9 @@ export const REWARDS: Record<
   "theme-premium": {
     label: "Tema Premium",
     description: "Palette esclusiva con accenti neon per veri malati di strada.",
+  },
+  "risk-song": {
+    label: "Risk Song",
+    description: "Sblocca un pezzo audio da far partire ad alto volume ad ogni tuo sorpasso perfetto.",
   },
 };

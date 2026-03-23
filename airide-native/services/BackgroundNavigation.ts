@@ -15,6 +15,9 @@ import {
 } from 'react-native-vosk';
 import { IntentParser, VoiceIntent } from '../utils/IntentParser';
 import * as Speech from 'expo-speech';
+import { Audio } from 'expo-av';
+import { firebaseFirestore } from './firebaseConfig';
+import auth from '@react-native-firebase/auth';
 
 const sleep = (time: number) => new Promise((resolve) => setTimeout(() => resolve(true), time));
 
@@ -302,6 +305,54 @@ const navigationTask = async (taskDataArguments: any) => {
     // START VOSK
     await setupVosk();
 
+    // Inizializza riskSongUri da firebase
+    try {
+        const currentUser = auth().currentUser;
+        if (currentUser) {
+            const doc = await firebaseFirestore.collection("users").doc(currentUser.uid).get();
+            const uri = doc.data()?.settings?.riskSongUri;
+            const startTime = doc.data()?.settings?.riskSongStartTime || 0;
+            if (uri) {
+                NavigationStore.set({ 
+                    riskSongUri: uri,
+                    riskSongStartTime: startTime 
+                });
+                console.log("[Background] 🎵 Risk Song URI caricata:", uri);
+            }
+        }
+    } catch(e) {
+        console.log("[Background] Errore fetch Risk Song URI:", e);
+    }
+
+    let speedHistory: number[] = [];
+    let lastRiskSongTime = 0;
+
+    // Aggiungo listener per Demo Mode (test manuale del sorpasso)
+    DeviceEventEmitter.addListener('TriggerDemoOvertake', async () => {
+        const store = NavigationStore.get();
+        const uri = store.riskSongUri;
+        if (uri) {
+            console.log("[Background] 🎮 Demo Overtake Triggered! Suono:", uri);
+            try {
+                const { sound } = await Audio.Sound.createAsync({ uri });
+                const startPosMs = (store.riskSongStartTime || 0) * 1000;
+                await sound.playFromPositionAsync(startPosMs);
+                
+                // Ferma esattamente dopo 20s
+                setTimeout(async () => {
+                    try {
+                        await sound.stopAsync();
+                        await sound.unloadAsync();
+                    } catch(e) {}
+                }, 20000);
+            } catch(e) {
+                console.error("Errore Demo Risk Song", e);
+            }
+        } else {
+            console.log("[Background] Nessuna Risk Song impostata per la demo.");
+        }
+    });
+
     await new Promise<void>(async (resolve) => {
         while (BackgroundService.isRunning()) {
             try {
@@ -346,6 +397,45 @@ const navigationTask = async (taskDataArguments: any) => {
                             
                             // Chiamiamo il backend per avere l'istruzione aggiornata
                             const res = await updatePosition(latitude, longitude);
+
+                            // --- LOGICA SORPASSO (PROXY) ---
+                            const speedKmh = (position.coords.speed || 0) * 3.6;
+                            speedHistory.push(speedKmh);
+                            if (speedHistory.length > 10) speedHistory.shift();
+
+                            if (speedHistory.length >= 5) {
+                                const minSpeed = Math.min(...speedHistory);
+                                const maxSpeed = Math.max(...speedHistory);
+                                
+                                // Proxy: Base min > 20km/h, Sbalzo >= 15km/h, decelerazione >= 5km/h dal picco in questo istante
+                                if (minSpeed > 20 && (maxSpeed - minSpeed) >= 15 && (maxSpeed - speedKmh) >= 5) {
+                                    const now = Date.now();
+                                    if (now - lastRiskSongTime > 60000) { // 1 Minuto Cooldown
+                                        const uri = currentStore.riskSongUri;
+                                        if (uri) {
+                                            lastRiskSongTime = now;
+                                            speedHistory = []; // Reset per sicurezza
+                                            
+                                            try {
+                                                console.log("[Background] ⚠️ SORPASSO RILEVATO! Play Risk Song");
+                                                const { sound } = await Audio.Sound.createAsync({ uri });
+                                                const startPosMs = (currentStore.riskSongStartTime || 0) * 1000;
+                                                await sound.playFromPositionAsync(startPosMs);
+                                                
+                                                setTimeout(async () => {
+                                                    try {
+                                                        await sound.stopAsync();
+                                                        await sound.unloadAsync();
+                                                    } catch(e) {}
+                                                }, 20000); 
+                                            } catch(e) {
+                                                console.error("Errore play Risk Song", e);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            // -------------------------------
         
                             if (res && res.nav) {
                                 // console.log('[Background] 🔍 DEBUG NAV:', JSON.stringify(res.nav, null, 2));
@@ -397,6 +487,7 @@ const navigationTask = async (taskDataArguments: any) => {
     try {
         console.log('[Background] 🛑 Vosk Stop...');
         stopVosk();
+        DeviceEventEmitter.removeAllListeners('TriggerDemoOvertake');
     } catch(e) {}
 };
 

@@ -12,6 +12,8 @@ export type NavState = {
     remainingDist?: number; // Distanza rimanente
     isNavigating: boolean;  // Se la navigazione è attiva
     isDemo?: boolean;       // Se siamo in modalità demo
+    riskSongUri?: string;   // URI dell'audio del sorpasso
+    riskSongStartTime?: number; // Punto di inizio in ms
 };
 
 // Stato iniziale
@@ -21,6 +23,8 @@ let currentData: NavState = {
     callStatus: 0,
     text: "Pronto",
     isNavigating: false,
+    riskSongUri: undefined,
+    riskSongStartTime: 0,
 };
 
 type Listener = (data: NavState) => void;
@@ -58,6 +62,8 @@ export const NavigationStore = {
             callStatus: 0,
             text: "Pronto",
             isNavigating: false,
+            riskSongUri: undefined,
+            riskSongStartTime: 0,
         };
         NavigationStore.notifyUI();
     }

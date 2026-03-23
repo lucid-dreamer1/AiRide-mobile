@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  DeviceEventEmitter,
 } from "react-native";
 
 import { firebaseFirestore } from "@/services/firebaseConfig";
@@ -229,6 +230,9 @@ export default function TrophyScreen() {
       totalKm: 0,
     });
   };
+  const handleTestRiskSong = () => {
+    DeviceEventEmitter.emit('TriggerDemoOvertake');
+  };
 
   // -----------------------------
   // UI
@@ -380,6 +384,13 @@ export default function TrophyScreen() {
               <Feather name="trash-2" size={16} color="#EF4444" />
               <Text style={[styles.devButtonText, { color: "#EF4444" }]}>
                 Reset
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.devButton} onPress={handleTestRiskSong}>
+              <Feather name="music" size={16} color={themeColors.text} />
+              <Text style={[styles.devButtonText, { color: themeColors.text }]}>
+                Demo Sorpasso
               </Text>
             </TouchableOpacity>
           </View>
