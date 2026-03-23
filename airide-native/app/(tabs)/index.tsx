@@ -244,7 +244,7 @@ export default function HomeScreen() {
 
           // 3. Overlay 
           if (Platform.Version >= 29) {
-             const canOverlay = await PermissionsAndroid.check("android.permission.SYSTEM_ALERT_WINDOW"); 
+             const canOverlay = await PermissionsAndroid.check("android.permission.SYSTEM_ALERT_WINDOW" as any); 
              // Attenzione: SYSTEM_ALERT_WINDOW non si checka con PermissionsAndroid standard su tutti i device, ma proviamo.
              // Se ritorna false (o non supportato), e Settings.canDrawOverlays è true... 
              // In realtà Settings.canDrawOverlays richiede Native Module.
@@ -311,13 +311,17 @@ export default function HomeScreen() {
     setTimeout(() => {
         requestAllPermissions().then((granted) => {
              if (granted) {
-                 console.log("✅ Permessi Init OK. Background Service pronto.");
-                 BackgroundNavigation.start();
+                 console.log("✅ Permessi Init OK.");
+                 // Avvia il servizio SOLO se Voice Command è abilitato o se serve per altro
+                 if (voiceSettings.enabled) {
+                      console.log("🎤 Voice Enabled -> Avvio Background Service...");
+                      BackgroundNavigation.start();
+                 }
              }
         });
     }, 1000);
 
-  }, []);
+  }, [voiceSettings.enabled]); // Aggiunto dipendenza voiceSettings
 
   // -------------------------------------------------------------
   // GET ROUTE

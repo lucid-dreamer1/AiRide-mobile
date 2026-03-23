@@ -405,18 +405,50 @@ export const BackgroundNavigation = {
         console.log("[Manager] 🟢 start() richiamato. isRunning?", BackgroundService.isRunning());
         
         if (Platform.OS === 'android') {
-            const hasAudio = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
-            if (!hasAudio) {
-                console.warn("[Manager] 🛑 START ABORTED: Missing RECORD_AUDIO permission!");
-                return;
-            }
+            try {
+                // Determine API Level for conditional permissions
+                const isAndroid12 = Platform.Version >= 31;
+                const isAndroid13 = Platform.Version >= 33;
 
-            if (Platform.Version >= 31) {
-                const hasBle = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT);
-                if (!hasBle) {
-                     console.warn("[Manager] 🛑 START ABORTED: Missing BLUETOOTH_CONNECT permission!");
-                     return;
+                const permissionsToRequest = [
+                    PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+                    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+                    PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+                    ...(isAndroid12 ? [
+                        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+                        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN
+                    ] : []),
+                    ...(isAndroid13 ? [
+                        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+                    ] : [])
+                ];
+
+                const granted = await PermissionsAndroid.requestMultiple(permissionsToRequest);
+
+                console.log("[Manager] 📝 Permissions Result:", granted);
+
+                const hasAudio = granted[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED;
+                const hasLocation = granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] === PermissionsAndroid.RESULTS.GRANTED;
+
+                if (!hasAudio || !hasLocation) {
+                    console.warn(`[Manager] 🛑 START ABORTED: Missing critical permissions! Audio: ${hasAudio}, Location: ${hasLocation}`);
+                    // Optional: You could show an alert here or callback to UI
+                    return;
                 }
+
+                if (isAndroid12) {
+                    const hasBleConnect = granted[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT] === PermissionsAndroid.RESULTS.GRANTED;
+                    if (!hasBleConnect) {
+                        console.warn("[Manager] 🛑 START ABORTED: Missing BLUETOOTH_CONNECT permission!");
+                        return;
+                    }
+                }
+                
+                // Note: POST_NOTIFICATIONS failure is acceptable (just no visible notification), so we don't abort based on it.
+
+            } catch (err) {
+                console.warn("[Manager] ⚠️ Permission request error:", err);
+                return;
             }
         }
 

@@ -15,19 +15,20 @@ export function useVoiceCommand({
 }: UseVoiceCommandProps) {
   const [isCommandWindowOpen, setIsCommandWindowOpen] = useState(false);
   
-  // Se enabled è true, assicuriamoci che il servizio background sia avviato (in modalità "ascolto")
+  // REMOVED: Automatic start/stop of Background Service here.
+  // It is now managed by HomeScreen (index.tsx) to ensure permissions are granted first.
+  
+  /*
   useEffect(() => {
       if (enabled) {
           BackgroundNavigation.start();
       }
-
-      // 🔥 CLEANUP: Quando la screen si smonta o enabled diventa false, FERMIAMO il brain
-      // Questo previene Vosk OOM quando si cambia tab (es. Rides)
       return () => {
-          console.log("[useVoiceCommand] Cleanup: Stopping Background Service to free memory");
+          console.log("[useVoiceCommand] Cleanup: Stopping Background Service");
           BackgroundNavigation.stop();
       };
   }, [enabled]);
+  */
 
   useEffect(() => {
     if (!enabled) return;
