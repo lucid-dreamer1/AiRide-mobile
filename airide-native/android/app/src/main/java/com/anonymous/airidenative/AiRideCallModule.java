@@ -179,4 +179,32 @@ public class AiRideCallModule extends ReactContextBaseJavaModule {
             }
         }
     }
+
+    @ReactMethod
+    public void startBluetoothSco() {
+        android.util.Log.d("AiRideCallModule", "startBluetoothSco called");
+        try {
+            android.media.AudioManager audioManager = (android.media.AudioManager) reactContext.getSystemService(Context.AUDIO_SERVICE);
+            if (audioManager != null) {
+                audioManager.startBluetoothSco();
+                audioManager.setBluetoothScoOn(true);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @ReactMethod
+    public void stopBluetoothSco() {
+        android.util.Log.d("AiRideCallModule", "stopBluetoothSco called");
+        try {
+            android.media.AudioManager audioManager = (android.media.AudioManager) reactContext.getSystemService(Context.AUDIO_SERVICE);
+            if (audioManager != null) {
+                audioManager.setBluetoothScoOn(false);
+                audioManager.stopBluetoothSco();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }

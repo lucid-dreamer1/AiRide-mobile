@@ -64,6 +64,20 @@ const CallModule = {
     }
   },
 
+  startBluetoothSco: () => {
+    if (Platform.OS === 'android') {
+        console.log("[CallModule] Enabling Bluetooth SCO for microphone...");
+        AiRideCallModule.startBluetoothSco();
+    }
+  },
+
+  stopBluetoothSco: () => {
+    if (Platform.OS === 'android') {
+        console.log("[CallModule] Disabling Bluetooth SCO...");
+        AiRideCallModule.stopBluetoothSco();
+    }
+  },
+
   addCallListener: (callback) => {
     if (Platform.OS === 'android') {
         return DeviceEventEmitter.addListener('CallRinging', callback);

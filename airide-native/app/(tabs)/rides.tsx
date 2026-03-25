@@ -160,8 +160,34 @@ export default function RidesScreen() {
             </View>
 
             <View style={styles.infoRow}>
-              <Text style={styles.info}>{item.distanceKm} km</Text>
-              <Text style={styles.info}>{item.durationMin} min</Text>
+              <View style={styles.infoPill}>
+                 <Feather name="map" size={14} color={themeColors.textMuted} />
+                 <Text style={styles.info}>{item.distanceKm} km</Text>
+              </View>
+              <View style={styles.infoPill}>
+                 <Feather name="clock" size={14} color={themeColors.textMuted} />
+                 <Text style={styles.info}>{item.durationMin} min</Text>
+              </View>
+            </View>
+
+            {/* Ride Analytics Grid */}
+            <View style={styles.statsGrid}>
+               <View style={styles.statBox}>
+                  <Text style={styles.statLabel}>V. Max</Text>
+                  <Text style={styles.statVal}>{item.maxSpeedKmh ?? 0} <Text style={{fontSize:11, color:themeColors.textMuted}}>km/h</Text></Text>
+               </View>
+               <View style={styles.statBox}>
+                  <Text style={styles.statLabel}>Media</Text>
+                  <Text style={styles.statVal}>{item.avgSpeedKmh ?? 0} <Text style={{fontSize:11, color:themeColors.textMuted}}>km/h</Text></Text>
+               </View>
+               <View style={styles.statBox}>
+                  <Text style={styles.statLabel}>Piega Sx</Text>
+                  <Text style={[styles.statVal, {color: '#4A90E2'}]}>{item.maxLeftRoll ?? 0}°</Text>
+               </View>
+               <View style={styles.statBox}>
+                  <Text style={styles.statLabel}>Piega Dx</Text>
+                  <Text style={[styles.statVal, {color: '#E85A2A'}]}>{item.maxRightRoll ?? 0}°</Text>
+               </View>
             </View>
 
             <TouchableOpacity
@@ -302,7 +328,39 @@ const createStyles = (c: any) =>
       justifyContent: "space-between",
       marginVertical: 8,
     },
+    infoPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
     info: { fontSize: 14, color: c.textMuted },
+
+    statsGrid: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      backgroundColor: 'rgba(0,0,0,0.2)',
+      borderRadius: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 8,
+      marginTop: 2,
+      marginBottom: 6,
+    },
+    statBox: {
+      alignItems: 'center',
+      flex: 1,
+    },
+    statLabel: {
+      fontSize: 10,
+      color: c.textMuted,
+      marginBottom: 4,
+      textTransform: "uppercase",
+      fontWeight: '700'
+    },
+    statVal: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: c.text,
+    },
 
     replayButton: {
       backgroundColor: c.accent,

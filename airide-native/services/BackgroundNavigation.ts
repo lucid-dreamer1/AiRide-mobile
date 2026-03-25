@@ -18,6 +18,7 @@ import * as Speech from 'expo-speech';
 import { Audio } from 'expo-av';
 import { firebaseFirestore } from './firebaseConfig';
 import auth from '@react-native-firebase/auth';
+import CallModule from './callModule';
 
 const sleep = (time: number) => new Promise((resolve) => setTimeout(() => resolve(true), time));
 
@@ -101,6 +102,7 @@ const checkWakeWord = (text: string) => {
         lastWakeWordTime = Date.now();
         if (!isCommandWindowOpen) {
             isCommandWindowOpen = true;
+            speak("Dimmi");
             DeviceEventEmitter.emit('Voice_Status', { status: 'listening' });
         }
         return true;
@@ -286,6 +288,9 @@ const setupVosk = async () => {
         } catch(e) {}
 
         console.log('[Background] 🎙️ Avvio Vosk (Start)...');
+        // Abilita microfono auricolari Bluetooth se presenti
+        CallModule.startBluetoothSco();
+
         // Non awaitiamo all'infinito.
         startVosk().then(() => {
              console.log('[Background] ✅ Vosk Avviato con successo!');
@@ -324,8 +329,7 @@ const navigationTask = async (taskDataArguments: any) => {
         console.log("[Background] Errore fetch Risk Song URI:", e);
     }
 
-    let speedHistory: number[] = [];
-    let lastRiskSongTime = 0;
+
 
     // Aggiungo listener per Demo Mode (test manuale del sorpasso)
     DeviceEventEmitter.addListener('TriggerDemoOvertake', async () => {
@@ -398,42 +402,20 @@ const navigationTask = async (taskDataArguments: any) => {
                             // Chiamiamo il backend per avere l'istruzione aggiornata
                             const res = await updatePosition(latitude, longitude);
 
-                            // --- LOGICA SORPASSO (PROXY) ---
+                            // --- STATISTICHE DEL VIAGGIO (Velocità) ---
                             const speedKmh = (position.coords.speed || 0) * 3.6;
-                            speedHistory.push(speedKmh);
-                            if (speedHistory.length > 10) speedHistory.shift();
-
-                            if (speedHistory.length >= 5) {
-                                const minSpeed = Math.min(...speedHistory);
-                                const maxSpeed = Math.max(...speedHistory);
-                                
-                                // Proxy: Base min > 20km/h, Sbalzo >= 15km/h, decelerazione >= 5km/h dal picco in questo istante
-                                if (minSpeed > 20 && (maxSpeed - minSpeed) >= 15 && (maxSpeed - speedKmh) >= 5) {
-                                    const now = Date.now();
-                                    if (now - lastRiskSongTime > 60000) { // 1 Minuto Cooldown
-                                        const uri = currentStore.riskSongUri;
-                                        if (uri) {
-                                            lastRiskSongTime = now;
-                                            speedHistory = []; // Reset per sicurezza
-                                            
-                                            try {
-                                                console.log("[Background] ⚠️ SORPASSO RILEVATO! Play Risk Song");
-                                                const { sound } = await Audio.Sound.createAsync({ uri });
-                                                const startPosMs = (currentStore.riskSongStartTime || 0) * 1000;
-                                                await sound.playFromPositionAsync(startPosMs);
-                                                
-                                                setTimeout(async () => {
-                                                    try {
-                                                        await sound.stopAsync();
-                                                        await sound.unloadAsync();
-                                                    } catch(e) {}
-                                                }, 20000); 
-                                            } catch(e) {
-                                                console.error("Errore play Risk Song", e);
-                                            }
-                                        }
+                            
+                            const currentStore = NavigationStore.get();
+                            const stats = currentStore.rideStats;
+                            if (stats && stats.currentRideId) {
+                                NavigationStore.set({
+                                    rideStats: {
+                                        ...stats,
+                                        maxSpeedKmh: Math.max(stats.maxSpeedKmh, speedKmh),
+                                        speedsSum: stats.speedsSum + speedKmh,
+                                        speedsCount: stats.speedsCount + 1,
                                     }
-                                }
+                                });
                             }
                             // -------------------------------
         

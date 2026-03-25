@@ -9,6 +9,10 @@ export type RideData = {
   distanceKm: number;
   durationMin: number;
   createdAt: number;
+  maxSpeedKmh?: number;
+  avgSpeedKmh?: number;
+  maxLeftRoll?: number;
+  maxRightRoll?: number;
 };
 
 export async function saveRide(data: RideData) {
@@ -19,14 +23,14 @@ export async function saveRide(data: RideData) {
     const userRef = firebaseFirestore.collection("users").doc(user.uid);
 
     // 1️⃣ Salva la corsa
-    await userRef.collection("rides").add(data);
+    const docRef = await userRef.collection("rides").add(data);
 
     // 2️⃣ Incrementa i km totali
     await userRef.update({
       totalKm: firestore.FieldValue.increment(data.distanceKm),
     });
 
-    return true;
+    return docRef.id;
   } catch (err) {
     console.error("Errore salvataggio tratta:", err);
     throw err;

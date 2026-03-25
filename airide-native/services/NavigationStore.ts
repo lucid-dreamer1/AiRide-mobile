@@ -14,6 +14,14 @@ export type NavState = {
     isDemo?: boolean;       // Se siamo in modalità demo
     riskSongUri?: string;   // URI dell'audio del sorpasso
     riskSongStartTime?: number; // Punto di inizio in ms
+    rideStats?: {
+        currentRideId: string | null;
+        maxSpeedKmh: number;
+        speedsSum: number;
+        speedsCount: number;
+        maxLeftRoll: number;
+        maxRightRoll: number;
+    };
 };
 
 // Stato iniziale
@@ -25,6 +33,14 @@ let currentData: NavState = {
     isNavigating: false,
     riskSongUri: undefined,
     riskSongStartTime: 0,
+    rideStats: {
+        currentRideId: null,
+        maxSpeedKmh: 0,
+        speedsSum: 0,
+        speedsCount: 0,
+        maxLeftRoll: 0,
+        maxRightRoll: 0,
+    }
 };
 
 type Listener = (data: NavState) => void;
@@ -62,8 +78,16 @@ export const NavigationStore = {
             callStatus: 0,
             text: "Pronto",
             isNavigating: false,
-            riskSongUri: undefined,
-            riskSongStartTime: 0,
+            riskSongUri: currentData.riskSongUri, // Mantieni URI
+            riskSongStartTime: currentData.riskSongStartTime, // Mantieni trim
+            rideStats: {
+                currentRideId: null,
+                maxSpeedKmh: 0,
+                speedsSum: 0,
+                speedsCount: 0,
+                maxLeftRoll: 0,
+                maxRightRoll: 0,
+            }
         };
         NavigationStore.notifyUI();
     }

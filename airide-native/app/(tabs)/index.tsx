@@ -16,6 +16,7 @@ import {
   PermissionsAndroid,
   StatusBar,
   Alert,
+  DeviceEventEmitter,
 } from "react-native";
 import SystemNavigationBar from 'react-native-system-navigation-bar';
 import { useTheme } from "@/contexts/ThemeContext";
@@ -24,6 +25,8 @@ import { saveRide } from "@/services/saveRide";
 import Toast from "react-native-toast-message";
 import { useAuth } from "@/services/useAuth";
 import InstructionCard from "@/components/InstructionCard";
+import { firebaseFirestore } from "@/services/firebaseConfig";
+import { DeviceMotion } from 'expo-sensors';
 
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { Feather } from "@expo/vector-icons";
@@ -37,7 +40,7 @@ import {
 } from "@/services/api";
 import { useNavigationContext } from "@/navigation/NavigationContext";
 import { useHelmet } from "@/contexts/HelmetContext";
-// import useNavigationUpdater from "@/hooks/useNavigationUpdater"; // RIMOSSO
+import { useOvertakeDetection } from "@/hooks/useOvertakeDetection";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useVoiceCommand } from "@/hooks/useVoiceCommand";
 import { useVoiceSettings } from "@/contexts/VoiceSettingsContext";
@@ -110,6 +113,15 @@ export default function HomeScreen() {
   const [showOnboarding, setShowOnboarding] = useState(false); // <--- New State
 
   const [isNavigating, setIsNavigating] = useState(false); // <--- NUOVO STATO
+  const [currentSpeedKmh, setCurrentSpeedKmh] = useState(0);
+
+  useOvertakeDetection({
+    currentSpeedKmh: DEMO_MODE ? 50 : currentSpeedKmh,
+    onOvertakeDetected: () => {
+      console.log("[HomeScreen] Sorpasso convalidato, emetto evento audio!");
+      DeviceEventEmitter.emit('TriggerDemoOvertake');
+    }
+  });
 
   const mapRef = useRef<MapView | null>(null);
 
@@ -142,6 +154,63 @@ export default function HomeScreen() {
     await AsyncStorage.setItem(`hasLaunched_${user.uid}`, 'true');
     // Opzionale: Chiedi permessi qui se non fatto nello slide
   };
+
+  // -------------------------------------------------------------
+  // RIDE STATS & DEVICE MOTION (ANGOLI DI PIEGA)
+  // -------------------------------------------------------------
+  useEffect(() => {
+    let subscription: any;
+
+    if (isNavigating) {
+      DeviceMotion.setUpdateInterval(500); 
+      subscription = DeviceMotion.addListener((listener) => {
+        if (listener.rotation) {
+          const rollDeg = listener.rotation.gamma * (180 / Math.PI);
+          
+          const currentStore = NavigationStore.get();
+          const stats = currentStore.rideStats;
+
+          if (stats && stats.currentRideId) {
+            let updated = false;
+            const newStats = { ...stats };
+
+            if (rollDeg > 0 && rollDeg > stats.maxRightRoll && rollDeg < 90) {
+                newStats.maxRightRoll = rollDeg;
+                updated = true;
+            } 
+            else if (rollDeg < 0 && Math.abs(rollDeg) > stats.maxLeftRoll && Math.abs(rollDeg) < 90) {
+                newStats.maxLeftRoll = Math.abs(rollDeg);
+                updated = true;
+            }
+
+            if (updated) {
+               NavigationStore.set({ rideStats: newStats });
+            }
+          }
+        }
+      });
+    } else {
+      // 2. Viaggio terminato, salviamo le stats finali!
+      const finalStore = NavigationStore.get();
+      const stats = finalStore.rideStats;
+      if (stats && stats.currentRideId && user?.uid) {
+         const avg = stats.speedsCount > 0 ? (stats.speedsSum / stats.speedsCount) : 0;
+         
+         firebaseFirestore.collection("users").doc(user.uid).collection("rides").doc(stats.currentRideId).update({
+            maxSpeedKmh: Math.round(stats.maxSpeedKmh),
+            avgSpeedKmh: Math.round(avg * 10) / 10,
+            maxLeftRoll: Math.round(stats.maxLeftRoll),
+            maxRightRoll: Math.round(stats.maxRightRoll),
+         }).catch(err => console.log("Errore salvataggio final stats", err));
+
+         NavigationStore.set({ rideStats: { ...stats, currentRideId: null } });
+      }
+    }
+
+    return () => {
+       if (subscription) subscription.remove();
+    };
+  }, [isNavigating]);
 
   const demoIndexRef = useRef(0);
   const demoTRef = useRef(0);
@@ -392,8 +461,10 @@ export default function HomeScreen() {
             distanceInterval: 5, // O ogni 5 metri
           },
           async (loc) => {
-            const { latitude, longitude } = loc.coords;
+            const { latitude, longitude, speed } = loc.coords;
             const newPos = { latitude, longitude };
+            
+            setCurrentSpeedKmh((speed || 0) * 3.6);
             
             // 1. Aggiorna posizione locale
             setCurrentPosition(newPos);
@@ -572,7 +643,7 @@ export default function HomeScreen() {
     } 
 
     try {
-      await saveRide({
+      const docId = await saveRide({
         destination,
         startCoords: {
           lat: currentPosition.latitude,
@@ -585,6 +656,18 @@ export default function HomeScreen() {
         distanceKm: Number(String(routeInfo?.distance).replace(" km", "")),
         durationMin: Number(String(routeInfo?.duration).replace(" min", "")),
         createdAt: Date.now(),
+      });
+
+      // Avvia statistiche per la nuova id
+      NavigationStore.set({
+         rideStats: {
+             currentRideId: docId as string,
+             maxSpeedKmh: 0,
+             speedsSum: 0,
+             speedsCount: 0,
+             maxLeftRoll: 0,
+             maxRightRoll: 0,
+         }
       });
 
       Toast.show({

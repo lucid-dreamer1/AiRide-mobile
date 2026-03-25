@@ -9,6 +9,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  Alert,
 } from "react-native";
 
 import { firebaseFirestore } from "@/services/firebaseConfig";
@@ -17,6 +18,7 @@ import { useAuth } from "@/services/useAuth";
 import Feather from "@expo/vector-icons/Feather";
 import { REWARDS } from "@/constants/achievements";
 import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import Toast from "react-native-toast-message";
 import { NavigationStore } from "@/services/NavigationStore";
 import Slider from '@react-native-community/slider';
@@ -143,17 +145,30 @@ export default function SettingsScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const fileUri = result.assets[0].uri;
-        // Salva direttamente in Firestore e nello stato locale
-        updateSetting("riskSongUri", fileUri);
+        const cacheUri = result.assets[0].uri;
+        // Crea un nome file sicuro per la memoria persistente
+        const safeName = result.assets[0].name ? result.assets[0].name.replace(/[^a-zA-Z0-9.\-_]/g, '') : `audio_${Date.now()}.m4a`;
+        // @ts-ignore
+        const permanentUri = `${FileSystem.documentDirectory}${safeName}`;
+
+        // @ts-ignore
+        await FileSystem.copyAsync({
+          from: cacheUri,
+          to: permanentUri,
+        });
+
+        // Salva la URI permanente, che non verrà cancellata dalla cache
+        updateSetting("riskSongUri", permanentUri);
+        
         Toast.show({
           type: "success",
           text1: "Risk Song Impostata",
           text2: "Il tuo audio per i sorpassi è pronto!",
         });
       }
-    } catch (err) {
-      console.log("Errore caricamento audio Risk Song:", err);
+    } catch (err: any) {
+      console.log("❌ Errore caricamento audio Risk Song:", err?.message || err);
+      Alert.alert("Errore Salvataggio Audio", String(err?.message || err));
       Toast.show({
         type: "error",
         text1: "Errore file",
