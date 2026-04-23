@@ -82,12 +82,15 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
     // TTS
     ttsService.speak("Incidente rilevato. Stai bene?", VoicePriority.CRITICAL);
 
-    // Attiviamo STT in modo sicuro tramite BackgroundNavigation
-    BackgroundNavigation.enableEmergencySTT();
-    if (sttListener.current) sttListener.current.remove();
-    sttListener.current = DeviceEventEmitter.addListener('AiRescue_Emergency_Cancel', () => {
-        handleCancel();
-    });
+    // Attiviamo STT in modo sicuro DOPO che la voce ha finito di parlare (ca 3 secondi)
+    // Se Vosk ascolta mentre il telefono parla, il microfono impazzisce e genera il crash __next_prime
+    setTimeout(() => {
+        BackgroundNavigation.enableEmergencySTT();
+        if (sttListener.current) sttListener.current.remove();
+        sttListener.current = DeviceEventEmitter.addListener('AiRescue_Emergency_Cancel', () => {
+            handleCancel();
+        });
+    }, 3000);
 
     // Start countdown
     countdownTimer.current = setInterval(() => {

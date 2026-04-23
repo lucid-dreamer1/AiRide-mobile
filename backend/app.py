@@ -419,7 +419,8 @@ def emergency_call():
             return jsonify({"error": "Dati mancanti"}), 400
 
         google_maps_link = f"https://maps.google.com/?q={lat},{lon}"
-        testo_messaggio = f"🚨 AiRescue: È stato rilevato un potenziale incidente per l'utente {user_id}. Posizione attuale: {google_maps_link}"
+        # Testo molto corto per non superare il limite del Trial Twilio (errore 30044)
+        testo_messaggio = f"🚨 AiRescue: Incidente! Posizione: {google_maps_link}"
 
         print("\n" + "="*50)
         print("🚨 ALLARME AI RESCUE (TWILIO) 🚨")
