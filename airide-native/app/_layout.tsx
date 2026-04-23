@@ -49,6 +49,9 @@ function NavigationThemeWrapper({ children }: { children: React.ReactNode }) {
   return <NavThemeProvider value={navigationTheme}>{children}</NavThemeProvider>;
 }
 
+// ⭐ AiRescue Context
+import { AiRescueProvider } from "@/contexts/AiRescueContext";
+
 import { useKeepAwake } from "expo-keep-awake";
 
 export default function RootLayout() {
@@ -110,21 +113,24 @@ export default function RootLayout() {
           <VoiceSettingsProvider>
             {/* ⭐ 1) Theme globale AiRide */}
             <ThemeProvider>
-              {/* ⭐ 2) Navigation Theme sincronizzato col tuo tema */}
-              <NavigationThemeWrapper>
-                <>
-                  <Stack>
-                    <Stack.Screen name="login" options={{ headerShown: false }} />
-                    <Stack.Screen name="register" options={{ headerShown: false }} />
-                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                    <Stack.Screen name="modal" options={{ presentation: "modal" }} />
-                  </Stack>
+              {/* ⭐ AiRescue Provider */}
+              <AiRescueProvider>
+                {/* ⭐ 2) Navigation Theme sincronizzato col tuo tema */}
+                <NavigationThemeWrapper>
+                  <>
+                    <Stack>
+                      <Stack.Screen name="login" options={{ headerShown: false }} />
+                      <Stack.Screen name="register" options={{ headerShown: false }} />
+                      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                      <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+                    </Stack>
 
-                  <StatusBar style="light" />
+                    <StatusBar style="light" />
 
-                  <Toast />
-                </>
-              </NavigationThemeWrapper>
+                    <Toast />
+                  </>
+                </NavigationThemeWrapper>
+              </AiRescueProvider>
             </ThemeProvider>
           </VoiceSettingsProvider>
         </AuthProvider>

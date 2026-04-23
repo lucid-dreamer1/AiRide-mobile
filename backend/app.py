@@ -396,6 +396,56 @@ def update_position():
 
 
 ###############################################################
+# AI RESCUE (Twilio Emergency Call)
+###############################################################
+
+import os
+
+# Le credenziali Twilio ora vengono lette dalle variabili d'ambiente di Render
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "IL_TUO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "IL_TUO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = os.environ.get("TWILIO_PHONE_NUMBER", "+1234567890")
+
+@app.route("/emergency_call", methods=["POST"])
+def emergency_call():
+    try:
+        data = request.get_json(force=True) or {}
+        user_id = data.get("user_id", "unknown")
+        lat = data.get("lat")
+        lon = data.get("lon")
+        contact = data.get("contact_phone") # Es: +393331234567
+
+        if not lat or not lon or not contact:
+            return jsonify({"error": "Dati mancanti"}), 400
+
+        google_maps_link = f"https://maps.google.com/?q={lat},{lon}"
+        testo_messaggio = f"🚨 AiRescue: È stato rilevato un potenziale incidente per l'utente {user_id}. Posizione attuale: {google_maps_link}"
+
+        print("\n" + "="*50)
+        print("🚨 ALLARME AI RESCUE (TWILIO) 🚨")
+        print(f"Destinazione: {contact}")
+        print("="*50 + "\n")
+
+        if TWILIO_ACCOUNT_SID != "IL_TUO_ACCOUNT_SID":
+            from twilio.rest import Client
+            client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+            message = client.messages.create(
+                body=testo_messaggio,
+                from_=TWILIO_PHONE_NUMBER,
+                to=contact
+            )
+            print(f"SMS inviato con SID: {message.sid}")
+
+        return jsonify({"status": "success", "message": "Allarme Twilio processato"})
+
+    except Exception as e:
+        print("Errore /emergency_call:", e)
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+###############################################################
 # AVVIO SERVER
 ###############################################################
 

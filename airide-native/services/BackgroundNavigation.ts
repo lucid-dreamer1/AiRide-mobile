@@ -36,6 +36,9 @@ let sessionState: VoiceSessionState = 'IDLE';
 let pendingIntent: VoiceIntent | null = null;
 let sessionTimeout: any = null;
 
+// --- AI RESCUE EMERGENCY STATE ---
+let isEmergencyMode = false;
+
 const RESET_SESSION_TIMEOUT = 10000; // 10s per rispondere
 
 const options = {
@@ -229,6 +232,16 @@ const setupVosk = async () => {
 
                     const justWokeUp = checkWakeWord(text);
                     const isWithinWindow = (Date.now() - lastWakeWordTime) < WAKE_WORD_WINDOW;
+
+                    // GESTIONE AI RESCUE (Priorità massima)
+                    if (isEmergencyMode) {
+                        const t = text.toLowerCase();
+                        if (t.includes("sì") || t.includes("si") || t.includes("sto bene") || t.includes("tutto bene") || t.includes("ok") || t.includes("annulla")) {
+                             console.log("[Background] 🚨 AiRescue Cancel Rilevato da Vosk!");
+                             DeviceEventEmitter.emit('AiRescue_Emergency_Cancel');
+                             isEmergencyMode = false;
+                        }
+                    }
 
                     // Se siamo in Sessione (attesa conferma), processiamo tutto
                     if (sessionState !== 'IDLE' || isWithinWindow || justWokeUp) {
@@ -549,4 +562,15 @@ export const BackgroundNavigation = {
             DeviceEventEmitter.removeAllListeners('CallStatusChanged');
         }
     },
+    // Nuova funzione per AiRescue STT
+    enableEmergencySTT: async () => {
+        isEmergencyMode = true;
+        // Se Vosk non è ancora inizializzato (es. navigazione spenta), lo avviamo forzatamente
+        if (!isVoskInitialized) {
+            await setupVosk();
+        }
+    },
+    disableEmergencySTT: () => {
+        isEmergencyMode = false;
+    }
 };

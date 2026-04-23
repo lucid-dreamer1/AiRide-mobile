@@ -10,6 +10,7 @@ import {
   Platform,
   UIManager,
   Alert,
+  TextInput,
 } from "react-native";
 
 import { firebaseFirestore } from "@/services/firebaseConfig";
@@ -39,6 +40,8 @@ export default function SettingsScreen() {
     introAnim: false,
     riskSongUri: null,
     riskSongStartTime: 0,
+    aiRescueEnabled: false,
+    emergencyContact: "",
   });
 
   const [localStartTime, setLocalStartTime] = useState<number>(0);
@@ -51,6 +54,7 @@ export default function SettingsScreen() {
     voice: true, // Voice Assistant section
     special: true,
     personalization: false,
+    airescue: true,
   });
 
   // Fetch settings + unlocked rewards
@@ -72,6 +76,8 @@ export default function SettingsScreen() {
           introAnim: data.settings?.introAnim ?? false,
           riskSongUri: data.settings?.riskSongUri ?? null,
           riskSongStartTime: data.settings?.riskSongStartTime ?? 0,
+          aiRescueEnabled: data.settings?.aiRescueEnabled ?? false,
+          emergencyContact: data.settings?.emergencyContact ?? "",
         });
 
         // Sincronizziamo subito la canzone con il Background Store così se la cambi funziona al volo
@@ -354,6 +360,49 @@ export default function SettingsScreen() {
             </View>
           )}
 
+        </View>
+      )}
+
+      {/* -------------------------- */}
+      {/* AI RESCUE */}
+      {/* -------------------------- */}
+
+      <TouchableOpacity
+        style={styles.sectionHeader}
+        onPress={() => toggleSection("airescue")}
+      >
+        <Text style={styles.sectionTitle}>AiRescue 🚨</Text>
+        <Feather
+          name={openSections.airescue ? "chevron-up" : "chevron-down"}
+          size={22}
+          color="#E85A2A"
+        />
+      </TouchableOpacity>
+
+      {openSections.airescue && (
+        <View style={styles.sectionContent}>
+          <SettingSwitch
+            label="Attiva AiRescue"
+            desc="Rileva cadute/urti e invia richieste di emergenza."
+            value={settings.aiRescueEnabled}
+            onChange={(v: boolean) => updateSetting("aiRescueEnabled", v)}
+          />
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.switchLabel}>Contatto di emergenza</Text>
+            <Text style={styles.switchDesc}>
+              Numero di telefono da contattare in caso di mancata risposta.
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="+39 333 1234567"
+              placeholderTextColor="#555"
+              keyboardType="phone-pad"
+              value={settings.emergencyContact}
+              onChangeText={(text) => setSettings({ ...settings, emergencyContact: text })}
+              onEndEditing={() => updateSetting("emergencyContact", settings.emergencyContact)}
+            />
+          </View>
         </View>
       )}
 
@@ -709,6 +758,26 @@ const styles = StyleSheet.create({
   infoText: {
     color: "#aaa",
     fontSize: 14,
+  },
+
+  inputContainer: {
+    paddingVertical: 14,
+    paddingHorizontal: 6,
+    backgroundColor: "#181818",
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  
+  textInput: {
+    backgroundColor: "#222",
+    color: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#333",
+    fontSize: 16,
   },
 
   previewCard: {

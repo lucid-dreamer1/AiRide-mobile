@@ -51,7 +51,7 @@ import { NavigationStore } from "@/services/NavigationStore"; // <--- Import Sto
 import { ttsService } from "@/services/TTSService";
 import { VoicePriority } from "@/types/voice";
 
-const DEMO_MODE = true;
+const DEMO_MODE = false;
 
 type Point = { latitude: number; longitude: number };
 

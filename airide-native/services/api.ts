@@ -58,4 +58,35 @@ export async function updatePosition(lat: number, lon: number) {
   }
 }
 
+// ======================================================
+// 📌 EMERGENZA (AiRescue)
+// ======================================================
+export async function sendEmergencyCall(userId: string, lat: number, lon: number, contactPhone: string) {
+  const url = `${BASE_URL}/emergency_call`;
+  
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, lat, lon, contact_phone: contactPhone }),
+    });
+
+    if (!res.ok) {
+      console.log(`sendEmergencyCall failed with status ${res.status}`);
+      // Ritorna l'errore o il testo raw per debug
+      const text = await res.text();
+      throw new Error(`Server returned ${res.status}: ${text}`);
+    }
+
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { status: "error", message: text };
+    }
+  } catch (err) {
+    console.log("sendEmergencyCall failed:", err);
+    throw err;
+  }
+}
 
