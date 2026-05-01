@@ -173,6 +173,7 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
             setError(null);
 
             console.log("✅ Connesso al casco reale!");
+
           } catch (err) {
             setError("Errore connessione al casco");
           } finally {

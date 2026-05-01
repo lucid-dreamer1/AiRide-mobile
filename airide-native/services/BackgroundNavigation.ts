@@ -459,9 +459,10 @@ const navigationTask = async (taskDataArguments: any) => {
                     const total = currentData.totalDist ?? 0;
                     const remaining = currentData.remainingDist ?? 0;
                     
-                    // Protocollo: freccia|metri turno|m totali|m mancanti|phone status
-                    // Modifica: Inviato 'remaining' invece di 'traveled' perché l'utente si aspetta valore decrescente
-                    const packet = `${currentData.arrow}|${currentData.distance}|${total}|${remaining}|${currentData.callStatus}`; // 4th param: remaining instead of traveled
+                    // Protocollo: freccia|metri turno|m totali|m mancanti
+                    // Modifica: Rimosso callStatus perché l'Arduino supporta max 4 campi. Se inviamo il 5° (callStatus), 
+                    // la funzione safeParseLong di Arduino concatena i numeri sballando la distanza rimanente!
+                    const packet = `${currentData.arrow}|${currentData.distance}|${total}|${remaining}`; 
 
                     console.log(`[Background] 🟢 BRAIN LOOP | Packet: ${packet}`);
     
