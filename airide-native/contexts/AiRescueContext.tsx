@@ -9,7 +9,7 @@ import { ttsService } from "../services/TTSService";
 import { VoicePriority } from "../types/voice";
 import Feather from "@expo/vector-icons/Feather";
 import { sendEmergencyCall } from "../services/api";
-import { DeviceEventEmitter } from "react-native";
+import { DeviceEventEmitter, NativeModules, PermissionsAndroid, Platform } from "react-native";
 import { BackgroundNavigation } from "../services/BackgroundNavigation";
 
 type AiRescueContextType = {
@@ -37,13 +37,19 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
     const unsub = firebaseFirestore
       .collection("users")
       .doc(user.uid)
-      .onSnapshot((doc) => {
-        const data = doc.data();
-        if (data && data.settings) {
-          setEnabled(data.settings.aiRescueEnabled || false);
-          setContact(data.settings.emergencyContact || "");
+      .onSnapshot(
+        (doc) => {
+          if (!doc) return;
+          const data = doc.data();
+          if (data && data.settings) {
+            setEnabled(data.settings.aiRescueEnabled || false);
+            setContact(data.settings.emergencyContact || "");
+          }
+        },
+        (err) => {
+          console.warn("AiRescueContext Snapshot Error:", err.message);
         }
-      });
+      );
     return unsub;
   }, [user]);
 
@@ -82,15 +88,24 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
     // TTS
     ttsService.speak("Incidente rilevato. Stai bene?", VoicePriority.CRITICAL);
 
-    // Attiviamo STT in modo sicuro DOPO che la voce ha finito di parlare (ca 3 secondi)
+    // Attiviamo STT in modo sicuro DOPO che la voce ha finito di parlare (ascoltando l'evento)
     // Se Vosk ascolta mentre il telefono parla, il microfono impazzisce e genera il crash __next_prime
-    setTimeout(() => {
+    let sttActivated = false;
+    const activateSTT = () => {
+        if (sttActivated) return;
+        sttActivated = true;
+        ttsListener.remove();
         BackgroundNavigation.enableEmergencySTT();
         if (sttListener.current) sttListener.current.remove();
         sttListener.current = DeviceEventEmitter.addListener('AiRescue_Emergency_Cancel', () => {
             handleCancel();
         });
-    }, 3000);
+    };
+
+    const ttsListener = DeviceEventEmitter.addListener('TTS_DONE', activateSTT);
+
+    // Timeout di sicurezza massimo (6 secondi) in caso di blocco del TTS
+    setTimeout(activateSTT, 6000);
 
     // Start countdown
     countdownTimer.current = setInterval(() => {
@@ -134,14 +149,52 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
       ttsService.speak("Nessuna risposta. Invio messaggio di emergenza.", VoicePriority.CRITICAL);
       let location = await Location.getCurrentPositionAsync({});
       
-      await sendEmergencyCall(
-        user?.uid || "unknown", 
-        location.coords.latitude, 
-        location.coords.longitude, 
-        contact || "unknown"
-      );
-      
-      Alert.alert("AiRescue", `Messaggio di emergenza inviato al ${contact}`);
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.SEND_SMS,
+          {
+            title: 'Permesso SMS Emergenza',
+            message: 'AiRide ha bisogno del permesso per inviare SMS in caso di incidente.',
+            buttonNeutral: 'Chiedi dopo',
+            buttonNegative: 'Annulla',
+            buttonPositive: 'OK',
+          },
+        );
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          try {
+            const message = `AiRide - Emergenza: Incidente rilevato. Sono qui: https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
+            await NativeModules.DirectSms.sendDirectSms(contact || "unknown", message);
+            Alert.alert("AiRescue", `Messaggio di emergenza inviato via SMS a ${contact}`);
+          } catch (smsError) {
+            console.warn("Invio SMS nativo fallito, fallback su Twilio:", smsError);
+            await sendEmergencyCall(
+              user?.uid || "unknown", 
+              location.coords.latitude, 
+              location.coords.longitude, 
+              contact || "unknown"
+            );
+            Alert.alert("AiRescue", `Messaggio di emergenza inviato via Cloud a ${contact}`);
+          }
+        } else {
+          console.log("Permesso SMS negato, utilizzo fallback su Twilio");
+          await sendEmergencyCall(
+            user?.uid || "unknown", 
+            location.coords.latitude, 
+            location.coords.longitude, 
+            contact || "unknown"
+          );
+          Alert.alert("AiRescue", `Messaggio di emergenza inviato via Cloud a ${contact}`);
+        }
+      } else {
+        // Fallback for iOS
+        await sendEmergencyCall(
+          user?.uid || "unknown", 
+          location.coords.latitude, 
+          location.coords.longitude, 
+          contact || "unknown"
+        );
+        Alert.alert("AiRescue", `Messaggio di emergenza inviato via Cloud a ${contact}`);
+      }
     } catch (e) {
       console.error("Emergency message failed", e);
       Alert.alert("Errore", "Impossibile inviare il messaggio di emergenza. Controlla la connessione.");

@@ -33,9 +33,9 @@ export interface VoiceMessage {
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   enabled: true,
   language: 'it',
-  frequency: 'standard',
-  speed: 1.0,
-  volume: 0.9,
+  frequency: 'standard', // Fisso
+  speed: 1.0,            // Fisso
+  volume: 0.9,           // Fisso
 };
 
 export const SUPPORTED_LANGUAGES = [

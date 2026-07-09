@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Regola principale: Un utente può accedere esclusivamente al proprio nodo
+    match /users/{userId} {
+      // Permette all'utente autenticato di leggere e scrivere i propri dati
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Propaga il permesso a tutte le sottocollezioni (es. 'rides')
+      match /{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Default deny: vieta esplicitamente l'accesso a qualsiasi altra collezione non dichiarata sopra
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

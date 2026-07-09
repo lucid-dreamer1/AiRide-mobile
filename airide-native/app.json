@@ -40,7 +40,9 @@
         "FOREGROUND_SERVICE_LOCATION",
         "FOREGROUND_SERVICE_MICROPHONE",
         "WAKE_LOCK",
-        "ACCESS_BACKGROUND_LOCATION"
+        "ACCESS_BACKGROUND_LOCATION",
+        "SEND_SMS",
+        "READ_CONTACTS"
       ],
       "config": {
         "googleMaps": {

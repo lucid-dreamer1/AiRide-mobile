@@ -2,6 +2,7 @@
 // Servizio Text-to-Speech con gestione priorità e coda messaggi
 
 import * as Speech from 'expo-speech';
+import { DeviceEventEmitter } from 'react-native';
 import { VoicePriority, TTSOptions, VoiceMessage } from '@/types/voice';
 
 class TTSService {
@@ -160,6 +161,8 @@ class TTSService {
     console.log('[TTS] ✅ Speech completato');
     this.speaking = false;
     this.currentMessage = null;
+    
+    DeviceEventEmitter.emit('TTS_DONE');
 
     // Processa il prossimo messaggio in coda
     this._processQueue();
@@ -172,6 +175,8 @@ class TTSService {
     console.error('[TTS] ❌ Errore TTS:', error);
     this.speaking = false;
     this.currentMessage = null;
+
+    DeviceEventEmitter.emit('TTS_DONE');
 
     // Prova col prossimo messaggio
     this._processQueue();

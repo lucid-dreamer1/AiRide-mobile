@@ -37,13 +37,18 @@ export const AuthProvider = ({ children }: any) => {
 
       if (currentUser) {
         // 🔥 Carica i dati utente da Firestore (RNFirebase)
-        const snap = await firestore()
-          .collection("users")
-          .doc(currentUser.uid)
-          .get();
+        try {
+          const snap = await firestore()
+            .collection("users")
+            .doc(currentUser.uid)
+            .get();
 
-        if (snap.exists()) {
-          setUserData(snap.data() as UserData);
+          if (snap.exists) {
+            setUserData(snap.data() as UserData);
+          }
+        } catch (error: any) {
+          console.warn("AuthContext Firestore Error:", error.message);
+          // Non facciamo crashare l'app, ma i dati utente non verranno caricati.
         }
       } else {
         setUserData(null);

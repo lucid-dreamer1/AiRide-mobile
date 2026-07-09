@@ -3,6 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 import { VoiceSettings, DEFAULT_VOICE_SETTINGS } from '@/types/voice';
 
 const STORAGE_KEY = '@airide_voice_settings';
@@ -52,6 +53,8 @@ export function VoiceSettingsProvider({ children }: { children: React.ReactNode 
       const updated = { ...settings, ...newSettings };
       setSettings(updated);
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      // Notifica il background service che le impostazioni sono cambiate
+      DeviceEventEmitter.emit('VoiceSettings_Updated');
       console.log('[VoiceSettings] Impostazioni aggiornate:', updated);
     } catch (error) {
       console.error('[VoiceSettings] Errore salvataggio:', error);

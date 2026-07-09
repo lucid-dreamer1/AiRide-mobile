@@ -11,7 +11,13 @@ import {
   UIManager,
   Alert,
   TextInput,
+  PermissionsAndroid,
+  FlatList,
+  Modal,
+  ActivityIndicator,
 } from "react-native";
+
+import * as Contacts from "expo-contacts";
 
 import { firebaseFirestore } from "@/services/firebaseConfig";
 import firestore from "@react-native-firebase/firestore";
@@ -53,9 +59,34 @@ export default function SettingsScreen() {
     theme: true,
     voice: true, // Voice Assistant section
     special: true,
-    personalization: false,
     airescue: true,
   });
+
+  const [contactsModalVisible, setContactsModalVisible] = useState(false);
+  const [contactsList, setContactsList] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const loadContacts = async () => {
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status === 'granted') {
+        const { data } = await Contacts.getContactsAsync({
+          fields: [Contacts.Fields.PhoneNumbers],
+        });
+        if (data && data.length > 0) {
+          const validContacts = data.filter(c => c.phoneNumbers && c.phoneNumbers.length > 0);
+          setContactsList(validContacts);
+          setContactsModalVisible(true);
+        } else {
+          Alert.alert("Attenzione", "Nessun contatto trovato nella rubrica.");
+        }
+      } else {
+        Alert.alert("Permesso negato", "Devi concedere il permesso per leggere la rubrica.");
+      }
+    } catch (e) {
+      console.warn("Errore caricamento contatti:", e);
+    }
+  };
 
   // Fetch settings + unlocked rewards
   useEffect(() => {
@@ -244,7 +275,7 @@ export default function SettingsScreen() {
         style={styles.sectionHeader}
         onPress={() => toggleSection("voice")}
       >
-        <Text style={styles.sectionTitle}>🎙️ Assistente Vocale</Text>
+        <Text style={styles.sectionTitle}>Assistente Vocale</Text>
         <Feather
           name={openSections.voice ? "chevron-up" : "chevron-down"}
           size={22}
@@ -255,111 +286,73 @@ export default function SettingsScreen() {
       {openSections.voice && <VoiceSettingsSection />}
 
       {/* -------------------------- */}
-      {/* FUNZIONI SPECIALI */}
+      {/* RISK SONG PREMIUM */}
       {/* -------------------------- */}
 
-      <TouchableOpacity
-        style={styles.sectionHeader}
-        onPress={() => toggleSection("special")}
-      >
-        <Text style={styles.sectionTitle}>Funzionalità speciali</Text>
-        <Feather
-          name={openSections.special ? "chevron-up" : "chevron-down"}
-          size={22}
-          color="#E85A2A"
-        />
-      </TouchableOpacity>
-
-      {openSections.special && (
-        <View style={styles.sectionContent}>
-
-          {/* HUD Plus */}
-          {hasReward("hud-plus") && (
-            <SettingSwitch
-              label={REWARDS["hud-plus"].label}
-              desc={REWARDS["hud-plus"].description}
-              value={settings.hudPlus}
-              onChange={(v: boolean) => updateSetting("hudPlus", v)}
-            />
-          )}
-
-          {/* Pro Mode */}
-          {hasReward("pro-mode") && (
-            <SettingSwitch
-              label={REWARDS["pro-mode"].label}
-              desc={REWARDS["pro-mode"].description}
-              value={settings.proMode}
-              onChange={(v: boolean) => updateSetting("proMode", v)}
-            />
-          )}
-
-          {/* Intro Animation */}
-          {hasReward("intro-animation") && (
-            <SettingSwitch
-              label={REWARDS["intro-animation"].label}
-              desc={REWARDS["intro-animation"].description}
-              value={settings.introAnim}
-              onChange={(v: boolean) => updateSetting("introAnim", v)}
-            />
-          )}
-
-          {/* Risk Song */}
-          {hasReward("risk-song") && (
-            <View style={[styles.switchContainer, { flexDirection: "column", alignItems: "stretch" }]}>
-              {/* Riga principale: Testo e Pulsante Carica */}
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.switchLabel}>{REWARDS["risk-song"].label}</Text>
-                  <Text style={styles.switchDesc}>
-                    {settings.riskSongUri 
-                      ? "Hai già impostato un audio. Clicca l'icona a lato per cambiarlo." 
-                      : REWARDS["risk-song"].description}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={handlePickRiskSong}
-                  style={[styles.testButton, { marginTop: 0, paddingVertical: 8, paddingHorizontal: 16 }]}
-                >
-                  <Feather name="music" size={18} color="white" />
-                  <Text style={styles.testButtonText}>
-                    {settings.riskSongUri ? "Modifica" : "Carica Audio"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Controlli aggiuntivi se l'audio è caricato */}
-              {settings.riskSongUri && (
-                <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderColor: "#333" }}>
-                  <Text style={[styles.switchLabel, { fontSize: 14 }]}>Trascina per scegliere l'inizio</Text>
-                  <Text style={[styles.switchDesc, { marginBottom: 10 }]}>Sposta il cursore per ascoltare l'anteprima e impostare il momento del sorpasso.</Text>
-                  
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Text style={{ color: "white", width: 45, textAlign: "left", fontSize: 13 }}>
-                      {Math.floor(localStartTime / 60)}:{(localStartTime % 60).toString().padStart(2, "0")}
-                    </Text>
-                    
-                    <Slider
-                      style={{ flex: 1, height: 40 }}
-                      minimumValue={0}
-                      maximumValue={audioDuration}
-                      step={1}
-                      value={localStartTime}
-                      onValueChange={(val) => setLocalStartTime(val)}
-                      onSlidingComplete={handleSlidingComplete}
-                      minimumTrackTintColor="#E85A2A"
-                      maximumTrackTintColor="#555"
-                      thumbTintColor="#E85A2A"
-                    />
-                    
-                    <Text style={{ color: "#aaa", width: 45, textAlign: "right", fontSize: 13 }}>
-                      {Math.floor(audioDuration / 60)}:{(Math.floor(audioDuration) % 60).toString().padStart(2, "0")}
-                    </Text>
-                  </View>
-                </View>
-              )}
+      {hasReward("risk-song") && (
+        <View style={[styles.sectionContent, { borderColor: '#E85A2A', borderWidth: 2, backgroundColor: '#1a0d08', marginTop: 24 }]}>
+          {/* Header Speciale Risk Song */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <Feather name="award" size={24} color="#E85A2A" style={{ marginRight: 10 }} />
+            <View>
+              <Text style={{ color: '#E85A2A', fontSize: 18, fontWeight: '800' }}>Risk Song Premium</Text>
+              <Text style={{ color: '#E85A2A', opacity: 0.8, fontSize: 12, fontWeight: '600' }}>Sbloccata con i tuoi Km</Text>
             </View>
-          )}
+          </View>
 
+          <View style={[styles.switchContainer, { flexDirection: "column", alignItems: "stretch", borderBottomWidth: 0 }]}>
+            {/* Riga principale: Testo e Pulsante Carica */}
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.switchLabel, { color: '#fff' }]}>{REWARDS["risk-song"].label}</Text>
+                <Text style={[styles.switchDesc, { color: '#ccc' }]}>
+                  {settings.riskSongUri 
+                    ? "Hai già impostato l'audio epico per i sorpassi. Premi qui per cambiarlo." 
+                    : REWARDS["risk-song"].description}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={handlePickRiskSong}
+                style={[styles.testButton, { marginTop: 0, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: '#E85A2A' }]}
+              >
+                <Feather name="music" size={18} color="white" />
+                <Text style={styles.testButtonText}>
+                  {settings.riskSongUri ? "Modifica" : "Carica Audio"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Controlli aggiuntivi se l'audio è caricato */}
+            {settings.riskSongUri && (
+              <View style={{ marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderColor: "rgba(232, 90, 42, 0.3)" }}>
+                <Text style={[styles.switchLabel, { fontSize: 15, color: '#E85A2A' }]}>Scegli il momento del drop</Text>
+                <Text style={[styles.switchDesc, { marginBottom: 16, color: '#aaa' }]}>Sposta il cursore per ascoltare l'anteprima e impostare da che secondo partirà l'audio quando superi i limiti.</Text>
+                
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text style={{ color: "white", width: 45, textAlign: "left", fontSize: 13 }}>
+                    {Math.floor(localStartTime / 60)}:{(localStartTime % 60).toString().padStart(2, "0")}
+                  </Text>
+                  
+                  <Slider
+                    style={{ flex: 1, height: 40 }}
+                    minimumValue={0}
+                    maximumValue={audioDuration}
+                    step={1}
+                    value={localStartTime}
+                    onValueChange={(val) => setLocalStartTime(val)}
+                    onSlidingComplete={handleSlidingComplete}
+                    minimumTrackTintColor="#E85A2A"
+                    maximumTrackTintColor="#555"
+                    thumbTintColor="#E85A2A"
+                  />
+                  
+                  <Text style={{ color: "#aaa", width: 45, textAlign: "right", fontSize: 13 }}>
+                    {Math.floor(audioDuration / 60)}:{(Math.floor(audioDuration) % 60).toString().padStart(2, "0")}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
       )}
 
@@ -371,7 +364,7 @@ export default function SettingsScreen() {
         style={styles.sectionHeader}
         onPress={() => toggleSection("airescue")}
       >
-        <Text style={styles.sectionTitle}>AiRescue 🚨</Text>
+        <Text style={styles.sectionTitle}>AiRescue</Text>
         <Feather
           name={openSections.airescue ? "chevron-up" : "chevron-down"}
           size={22}
@@ -385,7 +378,25 @@ export default function SettingsScreen() {
             label="Attiva AiRescue"
             desc="Rileva cadute/urti e invia richieste di emergenza."
             value={settings.aiRescueEnabled}
-            onChange={(v: boolean) => updateSetting("aiRescueEnabled", v)}
+            onChange={async (v: boolean) => {
+              if (v && Platform.OS === 'android') {
+                try {
+                  await PermissionsAndroid.request(
+                    PermissionsAndroid.PERMISSIONS.SEND_SMS,
+                    {
+                      title: 'Permesso SMS Emergenza',
+                      message: 'AiRide userà il permesso per inviare un SMS di emergenza (gratuito) in caso di incidente. Se rifiuti, verrà utilizzato il cloud.',
+                      buttonNeutral: 'Chiedi dopo',
+                      buttonNegative: 'Annulla',
+                      buttonPositive: 'OK',
+                    },
+                  );
+                } catch (err) {
+                  console.warn("Errore richiesta permessi SMS:", err);
+                }
+              }
+              updateSetting("aiRescueEnabled", v);
+            }}
           />
 
           <View style={styles.inputContainer}>
@@ -393,45 +404,111 @@ export default function SettingsScreen() {
             <Text style={styles.switchDesc}>
               Numero di telefono da contattare in caso di mancata risposta.
             </Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="+39 333 1234567"
-              placeholderTextColor="#555"
-              keyboardType="phone-pad"
-              value={settings.emergencyContact}
-              onChangeText={(text) => setSettings({ ...settings, emergencyContact: text })}
-              onEndEditing={() => updateSetting("emergencyContact", settings.emergencyContact)}
-            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
+              <TextInput
+                style={[styles.textInput, { flex: 1, marginTop: 0 }]}
+                placeholder="+39 333 1234567"
+                placeholderTextColor="#555"
+                keyboardType="phone-pad"
+                value={settings.emergencyContact}
+                onChangeText={(text) => setSettings({ ...settings, emergencyContact: text })}
+                onEndEditing={() => updateSetting("emergencyContact", settings.emergencyContact)}
+              />
+              <TouchableOpacity style={{ marginLeft: 10, padding: 14, backgroundColor: '#E85A2A', borderRadius: 12 }} onPress={loadContacts}>
+                <Feather name="users" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          <View style={{ marginTop: 6, padding: 12, backgroundColor: 'rgba(232, 90, 42, 0.05)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(232, 90, 42, 0.2)' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+              <Feather name="info" size={16} color="#E85A2A" style={{ marginRight: 6 }} />
+              <Text style={{ color: '#E85A2A', fontWeight: 'bold', fontSize: 14 }}>Disclaimer Responsabilità</Text>
+            </View>
+            <Text style={{ color: '#888', fontSize: 12, lineHeight: 18 }}>
+              AiRide non garantisce l'invio infallibile del messaggio in ogni condizione (es. assenza di campo o crash critico del dispositivo). Il sistema va inteso come ausilio aggiuntivo e non sostituisce il buon senso e la prudenza alla guida.
+            </Text>
           </View>
         </View>
       )}
 
-      {/* -------------------------- */}
-      {/* PERSONALIZZAZIONE */}
-      {/* -------------------------- */}
 
-      <TouchableOpacity
-        style={styles.sectionHeader}
-        onPress={() => toggleSection("personalization")}
-      >
-        <Text style={styles.sectionTitle}>Personalizzazione</Text>
-        <Feather
-          name={openSections.personalization ? "chevron-up" : "chevron-down"}
-          size={22}
-          color="#E85A2A"
-        />
-      </TouchableOpacity>
-
-      {openSections.personalization && (
-        <View style={styles.sectionContent}>
-          <Text style={styles.infoText}>
-            Qui potrai personalizzare HUD, stile strada, elementi premium
-            visivi e molto altro.
-          </Text>
+      
+      {/* MODAL CONTATTI */}
+      <Modal visible={contactsModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setContactsModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: '#0a0a0a', paddingTop: Platform.OS === 'ios' ? 20 : 50 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 15 }}>
+            <Text style={{ color: '#fff', fontSize: 28, fontWeight: '800' }}>Rubrica</Text>
+            <TouchableOpacity onPress={() => setContactsModalVisible(false)} style={{ padding: 8, backgroundColor: '#1f1f1f', borderRadius: 20 }}>
+              <Feather name="x" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#1c1c1c', borderRadius: 12, paddingHorizontal: 12 }}>
+              <Feather name="search" size={18} color="#777" />
+              <TextInput
+                style={{ flex: 1, color: '#fff', paddingVertical: 12, paddingHorizontal: 10, fontSize: 16 }}
+                placeholder="Cerca contatto..."
+                placeholderTextColor="#777"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery("")} style={{ padding: 4 }}>
+                  <Feather name="x-circle" size={18} color="#777" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+          
+          <FlatList
+             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+             data={contactsList.filter(c => (c.name || '').toLowerCase().includes(searchQuery.toLowerCase()))}
+             keyExtractor={item => item.id}
+             renderItem={({ item }) => (
+               <TouchableOpacity 
+                  style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    backgroundColor: '#151515', 
+                    paddingVertical: 14, 
+                    paddingHorizontal: 16,
+                    borderRadius: 16,
+                    marginBottom: 10
+                  }}
+                  onPress={() => {
+                     const phone = item.phoneNumbers[0].number;
+                     setSettings({ ...settings, emergencyContact: phone });
+                     updateSetting("emergencyContact", phone);
+                     setContactsModalVisible(false);
+                     setSearchQuery("");
+                  }}
+               >
+                 <View style={{ 
+                    width: 48, height: 48, borderRadius: 24, 
+                    backgroundColor: '#2a1a14', 
+                    borderWidth: 1, borderColor: '#E85A2A',
+                    justifyContent: 'center', alignItems: 'center', 
+                    marginRight: 14 
+                 }}>
+                   <Text style={{ color: '#E85A2A', fontSize: 20, fontWeight: '700' }}>
+                     {(item.name ? item.name.charAt(0) : '?').toUpperCase()}
+                   </Text>
+                 </View>
+                 
+                 <View style={{ flex: 1 }}>
+                   <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>{item.name || 'Senza Nome'}</Text>
+                   <Text style={{ color: '#888', fontSize: 14, marginTop: 4 }}>{item.phoneNumbers[0].number}</Text>
+                 </View>
+                 
+                 <Feather name="chevron-right" size={20} color="#444" />
+               </TouchableOpacity>
+             )}
+          />
         </View>
-      )}
+      </Modal>
 
-      <View style={{ height: 80 }} />
     </ScrollView>
   );
 }
@@ -485,21 +562,60 @@ const SettingSwitch = ({
 import { useVoiceSettings } from "@/contexts/VoiceSettingsContext";
 import { SUPPORTED_LANGUAGES } from "@/types/voice";
 import { ttsService, getLanguageCode } from "@/services/TTSService";
+import { VoskModelManager, DownloadProgress } from "@/services/VoskModelManager";
+
+type ModelState = 'checking' | 'bundled' | 'downloaded' | 'not_downloaded' | 'downloading';
 
 const VoiceSettingsSection = () => {
   const { settings, updateSettings } = useVoiceSettings();
+  const [modelStates, setModelStates] = React.useState<Record<string, ModelState>>({});
+  const [downloadProgress, setDownloadProgress] = React.useState<Record<string, number>>({});
+
+  // Controlla stato modelli all'avvio
+  React.useEffect(() => {
+    const checkModels = async () => {
+      const states: Record<string, ModelState> = {};
+      for (const lang of SUPPORTED_LANGUAGES) {
+        if (lang.code === 'it') { states[lang.code] = 'bundled'; continue; }
+        states[lang.code] = 'checking';
+        setModelStates({ ...states });
+        const downloaded = await VoskModelManager.isDownloaded(lang.code);
+        states[lang.code] = downloaded ? 'downloaded' : 'not_downloaded';
+        setModelStates({ ...states });
+      }
+    };
+    checkModels();
+  }, []);
+
+  const handleDownload = async (langCode: string) => {
+    setModelStates(prev => ({ ...prev, [langCode]: 'downloading' }));
+    setDownloadProgress(prev => ({ ...prev, [langCode]: 0 }));
+    try {
+      await VoskModelManager.downloadModel(langCode, (p: DownloadProgress) => {
+        setDownloadProgress(prev => ({ ...prev, [langCode]: p.progress }));
+      });
+      setModelStates(prev => ({ ...prev, [langCode]: 'downloaded' }));
+      Toast.show({ type: 'success', text1: 'Modello scaricato!', text2: `Il riconoscimento vocale in ${langCode.toUpperCase()} è ora disponibile offline.` });
+    } catch (e) {
+      setModelStates(prev => ({ ...prev, [langCode]: 'not_downloaded' }));
+      Toast.show({ type: 'error', text1: 'Errore download', text2: 'Controlla la connessione internet.' });
+    }
+  };
+
+  const handleDelete = async (langCode: string) => {
+    await VoskModelManager.deleteModel(langCode);
+    setModelStates(prev => ({ ...prev, [langCode]: 'not_downloaded' }));
+  };
 
   const handleTestVoice = () => {
-    const testText = {
+    const testText: Record<string, string> = {
       it: "Svolta a destra tra 100 metri",
       en: "Turn right in 100 meters",
       fr: "Tournez à droite dans 100 mètres",
       de: "Rechts abbiegen in 100 Meter",
       es: "Gire a la derecha en 100 metros",
-    }[settings.language] || "Test voce";
-
-    // IMPORTANTE: Passa anche le opzioni di lingua, velocità e volume
-    ttsService.speak(testText, 2, {
+    };
+    ttsService.speak(testText[settings.language] || "Test voce", 2, {
       language: getLanguageCode(settings.language),
       rate: settings.speed,
       volume: settings.volume,
@@ -516,124 +632,104 @@ const VoiceSettingsSection = () => {
         onChange={(v) => updateSettings({ enabled: v })}
       />
 
-      {/* Lingua */}
-      <Text style={styles.subSectionTitle}>Lingua</Text>
-      <View style={styles.languageGrid}>
-        {SUPPORTED_LANGUAGES.map((lang) => (
-          <TouchableOpacity
-            key={lang.code}
-            onPress={() => updateSettings({ language: lang.code })}
-            style={[
-              styles.languageButton,
-              settings.language === lang.code && styles.languageButtonActive,
-            ]}
-          >
-            <Text style={styles.languageFlag}>{lang.flag}</Text>
-            <Text style={styles.languageName}>{lang.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {/* Lingua + Download Modello */}
+      <Text style={styles.subSectionTitle}>Lingua & Modello Vocale</Text>
+      <View style={{ gap: 10 }}>
+        {SUPPORTED_LANGUAGES.map((lang) => {
+          const state = modelStates[lang.code] ?? 'checking';
+          const progress = downloadProgress[lang.code] ?? 0;
+          const isSelected = settings.language === lang.code;
+          const isAvailable = state === 'bundled' || state === 'downloaded';
 
-      {/* Frequenza */}
-      <Text style={styles.subSectionTitle}>Frequenza Indicazioni</Text>
-      <View style={styles.frequencyButtons}>
-        {[
-          { value: "minimal", label: "Minimale" },
-          { value: "standard", label: "Standard" },
-          { value: "verbose", label: "Completa" },
-        ].map((freq) => (
-          <TouchableOpacity
-            key={freq.value}
-            onPress={() =>
-              updateSettings({ frequency: freq.value as any })
-            }
-            style={[
-              styles.frequencyButton,
-              settings.frequency === freq.value && styles.frequencyButtonActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.frequencyText,
-                settings.frequency === freq.value &&
-                  styles.frequencyTextActive,
-              ]}
+          return (
+            <View
+              key={lang.code}
+              style={{
+                backgroundColor: isSelected ? 'rgba(232, 90, 42, 0.08)' : '#151515',
+                borderRadius: 14,
+                borderWidth: isSelected ? 1.5 : 1,
+                borderColor: isSelected ? '#E85A2A' : '#222',
+                padding: 14,
+              }}
             >
-              {freq.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+              {/* Riga principale */}
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 24, marginRight: 10 }}>{lang.flag}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>{lang.name}</Text>
+                  <Text style={{ color: '#666', fontSize: 12, marginTop: 2 }}>
+                    {state === 'checking' ? 'Verifica...'
+                      : state === 'bundled' ? 'Incluso nell\'app'
+                      : state === 'downloaded' ? `Scaricato · ${VoskModelManager.getSizeMB(lang.code)} MB`
+                      : state === 'downloading' ? `Scaricamento ${Math.round(progress * 100)}%...`
+                      : `Non scaricato · ~${VoskModelManager.getSizeMB(lang.code)} MB`}
+                  </Text>
+                </View>
 
-      {/* Velocità Voce */}
-      <Text style={styles.subSectionTitle}>Velocità Voce</Text>
-      <View style={styles.frequencyButtons}>
-        {[
-          { value: 0.8, label: "Lento" },
-          { value: 1.0, label: "Normale" },
-          { value: 1.2, label: "Veloce" },
-        ].map((sp) => (
-          <TouchableOpacity
-            key={sp.value}
-            onPress={() => updateSettings({ speed: sp.value })}
-            style={[
-              styles.frequencyButton,
-              settings.speed === sp.value && styles.frequencyButtonActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.frequencyText,
-                settings.speed === sp.value &&
-                  styles.frequencyTextActive,
-              ]}
-            >
-              {sp.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+                {/* Azioni a destra */}
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  {/* Bottone seleziona (solo se modello disponibile) */}
+                  {isAvailable && (
+                    <TouchableOpacity
+                      onPress={() => updateSettings({ language: lang.code })}
+                      style={{
+                        backgroundColor: isSelected ? '#E85A2A' : '#2a2a2a',
+                        borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
+                      }}
+                    >
+                      <Text style={{ color: isSelected ? '#fff' : '#aaa', fontSize: 12, fontWeight: '700' }}>
+                        {isSelected ? '✓ Attiva' : 'Usa'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
 
-      {/* Volume */}
-      <Text style={styles.subSectionTitle}>Volume</Text>
-      <View style={styles.frequencyButtons}>
-        {[
-          { value: 0.5, label: "Basso" },
-          { value: 0.7, label: "Medio" },
-          { value: 0.9, label: "Alto" },
-        ].map((vol) => (
-          <TouchableOpacity
-            key={vol.value}
-            onPress={() => updateSettings({ volume: vol.value })}
-            style={[
-              styles.frequencyButton,
-              settings.volume === vol.value && styles.frequencyButtonActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.frequencyText,
-                settings.volume === vol.value &&
-                  styles.frequencyTextActive,
-              ]}
-            >
-              {vol.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+                  {/* Bottone download */}
+                  {state === 'not_downloaded' && (
+                    <TouchableOpacity
+                      onPress={() => handleDownload(lang.code)}
+                      style={{ backgroundColor: '#1a1a2e', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#E85A2A' }}
+                    >
+                      <Feather name="download" size={16} color="#E85A2A" />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Bottone elimina */}
+                  {state === 'downloaded' && (
+                    <TouchableOpacity
+                      onPress={() => handleDelete(lang.code)}
+                      style={{ backgroundColor: '#1a1a1a', borderRadius: 8, padding: 8 }}
+                    >
+                      <Feather name="trash-2" size={16} color="#555" />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Spinner download */}
+                  {state === 'downloading' && (
+                    <ActivityIndicator size="small" color="#E85A2A" />
+                  )}
+                </View>
+              </View>
+
+              {/* Progress bar durante il download */}
+              {state === 'downloading' && (
+                <View style={{ marginTop: 10, height: 4, backgroundColor: '#222', borderRadius: 2 }}>
+                  <View style={{ width: `${Math.round(progress * 100)}%`, height: 4, backgroundColor: '#E85A2A', borderRadius: 2 }} />
+                </View>
+              )}
+            </View>
+          );
+        })}
       </View>
 
       {/* Test Button */}
-      <TouchableOpacity
-        onPress={handleTestVoice}
-        style={styles.testButton}
-      >
+      <TouchableOpacity onPress={handleTestVoice} style={[styles.testButton, { marginTop: 16 }]}>
         <Feather name="volume-2" size={18} color="white" />
         <Text style={styles.testButtonText}>Prova Voce</Text>
       </TouchableOpacity>
     </View>
   );
 };
+
 
 /* -------------------------------------------------------- */
 /* THEME PREVIEW */
@@ -690,57 +786,62 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 14,
-    paddingHorizontal: 6,
-    marginTop: 12,
-    backgroundColor: "#111",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+    marginTop: 16,
     borderRadius: 12,
   },
 
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
+    fontSize: 22,
+    fontWeight: "800",
     color: "#fff",
+    letterSpacing: 0.3,
   },
 
   sectionContent: {
-    backgroundColor: "#111",
-    padding: 12,
-    borderRadius: 12,
-    marginTop: 6,
-    marginBottom: 10,
+    backgroundColor: "#121212",
+    padding: 16,
+    borderRadius: 20,
+    marginTop: 4,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#1e1e1e",
   },
 
   optionRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: "#181818",
-    marginBottom: 8,
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: "#1a1a1a",
+    marginBottom: 10,
   },
 
   optionSelected: {
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: "#E85A2A",
-    backgroundColor: "#2A1A14",
+    backgroundColor: "rgba(232, 90, 42, 0.1)",
   },
 
   optionLabel: {
     fontSize: 16,
+    fontWeight: "500",
     color: "#fff",
   },
 
   switchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 6,
-    backgroundColor: "#181818",
-    borderRadius: 12,
-    marginBottom: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    backgroundColor: "transparent",
+    borderBottomWidth: 1,
+    borderBottomColor: "#1e1e1e",
+    marginBottom: 4,
   },
 
   switchLabel: {
@@ -761,30 +862,32 @@ const styles = StyleSheet.create({
   },
 
   inputContainer: {
-    paddingVertical: 14,
-    paddingHorizontal: 6,
-    backgroundColor: "#181818",
-    borderRadius: 12,
-    marginBottom: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    backgroundColor: "transparent",
+    marginBottom: 4,
   },
   
   textInput: {
-    backgroundColor: "#222",
+    backgroundColor: "#1a1a1a",
     color: "#fff",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 12,
     borderWidth: 1,
-    borderColor: "#333",
+    borderColor: "#222",
     fontSize: 16,
+    fontWeight: "500",
   },
 
   previewCard: {
-    borderWidth: 2,
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#222",
+    backgroundColor: "#1a1a1a",
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 20,
   },
 
   previewTitle: {
@@ -829,49 +932,50 @@ const styles = StyleSheet.create({
   languageButton: {
     flex: 1,
     minWidth: "30%",
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 8,
-    borderRadius: 12,
-    backgroundColor: "#181818",
+    borderRadius: 16,
+    backgroundColor: "#1a1a1a",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "transparent",
+    borderWidth: 1,
+    borderColor: "#222",
   },
 
   languageButtonActive: {
     borderColor: "#E85A2A",
-    backgroundColor: "#2A1A14",
+    backgroundColor: "rgba(232, 90, 42, 0.1)",
   },
 
   languageFlag: {
-    fontSize: 24,
-    marginBottom: 4,
+    fontSize: 28,
+    marginBottom: 6,
   },
 
   languageName: {
-    fontSize: 12,
-    color: "#fff",
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#ccc",
   },
 
   frequencyButtons: {
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 16,
   },
 
   frequencyButton: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: "#181818",
+    backgroundColor: "#1a1a1a",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "transparent",
+    borderWidth: 1,
+    borderColor: "#222",
   },
 
   frequencyButtonActive: {
     borderColor: "#E85A2A",
-    backgroundColor: "#2A1A14",
+    backgroundColor: "rgba(232, 90, 42, 0.1)",
   },
 
   frequencyText: {
@@ -885,20 +989,26 @@ const styles = StyleSheet.create({
   },
 
   testButton: {
-    marginTop: 16,
+    marginTop: 20,
     backgroundColor: "#E85A2A",
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 20,
-    borderRadius: 12,
+    borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 10,
+    shadowColor: "#E85A2A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
 
   testButtonText: {
     color: "white",
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
 });
