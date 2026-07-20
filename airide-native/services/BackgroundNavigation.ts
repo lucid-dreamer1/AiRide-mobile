@@ -781,6 +781,17 @@ export const BackgroundNavigation = {
                      }
                 });
 
+                // Listener per sospendere STT durante OTA (previene crash __next_prime overflow)
+                DeviceEventEmitter.addListener('OtaStateChanged', (isOtaInProgress: boolean) => {
+                     if (isOtaInProgress) {
+                         console.log("[Background] 🛑 Sospensione temporanea Vosk per OTA in corso...");
+                         stopVosk();
+                     } else {
+                         console.log("[Background] 🎙️ Ripresa Vosk (OTA terminato)");
+                         startVosk().catch(e => console.error('[Background] Errore ripresa Vosk:', e));
+                     }
+                });
+
                 await BackgroundService.start(navigationTask, options);
                 console.log("[Manager] ✅ Brain Started");
             } catch (e) {
@@ -793,6 +804,7 @@ export const BackgroundNavigation = {
             await BackgroundService.stop();
             console.log("[Manager] Brain Stopped");
             DeviceEventEmitter.removeAllListeners('CallStatusChanged');
+            DeviceEventEmitter.removeAllListeners('OtaStateChanged');
         }
     },
     // Nuova funzione per AiRescue STT
