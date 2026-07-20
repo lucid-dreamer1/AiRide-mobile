@@ -1,0 +1,5 @@
+{
+  "version": "2.0.0",
+  "url": "https://raw.githubusercontent.com/lucid-dreamer1/AiRide-mobile/master/firmware.bin",
+  "releaseNotes": "Aggiunto supporto BLE OTA e ottimizzazioni grafiche per il display OLED del casco."
+}
