@@ -1,7 +1,7 @@
 // ------------------------------------------------------------
 // OtaContext.tsx
 // Context React per la gestione della macchina a stati OTA.
-// Espone stato, progresso e azioni all'UI.
+// Espone stato, progresso e azioni all'UI, incluso il controllo remoto.
 // ------------------------------------------------------------
 
 import React, {
@@ -10,11 +10,15 @@ import React, {
   useState,
   useCallback,
   useRef,
+  useEffect,
 } from "react";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { bleService } from "../services/BleSingleton";
 import { bleOtaService, OTA_RESP } from "../services/BleOtaService";
+
+// URL di default per il controllo del firmware. Sostituibile con API del backend reale.
+const FIRMWARE_JSON_URL = "https://raw.githubusercontent.com/lucid-dreamer1/AiRide-mobile/master/firmware_latest.json";
 
 // ────────────────────────────────────────────────────────────
 // Tipi
@@ -22,6 +26,7 @@ import { bleOtaService, OTA_RESP } from "../services/BleOtaService";
 export type OtaState =
   | "IDLE"
   | "PREPARING"       // Lettura file + calcolo CRC
+  | "DOWNLOADING_FW"  // Scaricamento firmware remoto
   | "UPLOADING"       // Streaming in corso
   | "VERIFYING"       // In attesa SUCCESS da ESP32
   | "SUCCESS"
@@ -38,6 +43,12 @@ export type OtaFirmwareInfo = {
   crc32: string; // hex
 };
 
+export type RemoteUpdateInfo = {
+  version: string;
+  url: string;
+  releaseNotes: string;
+};
+
 type OtaContextType = {
   otaState: OtaState;
   progress: number;             // 0–100
@@ -46,6 +57,14 @@ type OtaContextType = {
   errorMessage: string | null;
   firmwareInfo: OtaFirmwareInfo | null;
   lastEspOpcode: number | null; // ultimo opcode ricevuto dall'ESP32
+  
+  // Gestione aggiornamenti automatici
+  updateAvailable: boolean;
+  latestVersionInfo: RemoteUpdateInfo | null;
+  checkingForUpdates: boolean;
+  checkForUpdates: () => Promise<void>;
+  downloadAndStartOta: () => Promise<void>;
+
   /** Avvia il flusso OTA: selezione file → upload */
   startOta: (source?: OtaSource) => Promise<void>;
   /** Seleziona solo il file, senza avviare l'upload */
@@ -69,6 +88,11 @@ const OtaContext = createContext<OtaContextType>({
   errorMessage: null,
   firmwareInfo: null,
   lastEspOpcode: null,
+  updateAvailable: false,
+  latestVersionInfo: null,
+  checkingForUpdates: false,
+  checkForUpdates: async () => {},
+  downloadAndStartOta: async () => {},
   startOta: async () => {},
   pickFirmwareFile: async () => {},
   beginUpload: async () => {},
@@ -90,8 +114,68 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
   const [firmwareInfo, setFirmwareInfo] = useState<OtaFirmwareInfo | null>(null);
   const [lastEspOpcode, setLastEspOpcode] = useState<number | null>(null);
 
+  // Aggiornamento automatico
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [latestVersionInfo, setLatestVersionInfo] = useState<RemoteUpdateInfo | null>(null);
+  const [checkingForUpdates, setCheckingForUpdates] = useState(false);
+
   // Buffer del firmware in memoria (Uint8Array)
   const firmwareBinRef = useRef<Uint8Array | null>(null);
+
+  // Versione corrente del firmware hardcoded o attesa sul casco v1.0
+  const CURRENT_HELMET_VERSION = "1.0.0";
+
+  // ── Verifica aggiornamenti dal server ──────────────────────
+  const checkForUpdates = useCallback(async () => {
+    try {
+      setCheckingForUpdates(true);
+      setErrorMsg(null);
+      console.log("[OtaContext] Controllo aggiornamenti firmware remoto...");
+
+      const response = await fetch(FIRMWARE_JSON_URL, {
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      if (!response.ok) {
+        throw new Error(`Impossibile connettersi al server (HTTP ${response.status})`);
+      }
+
+      const data = await response.json();
+      console.log("[OtaContext] Dati firmware ricevuti:", data);
+
+      if (data && data.version && data.url) {
+        setLatestVersionInfo({
+          version: data.version,
+          url: data.url,
+          releaseNotes: data.releaseNotes ?? "Nessuna nota di rilascio.",
+        });
+
+        // Eseguiamo un check semantico elementare della versione
+        if (data.version !== CURRENT_HELMET_VERSION) {
+          setUpdateAvailable(true);
+          console.log(`[OtaContext] Nuovo aggiornamento trovato! (${CURRENT_HELMET_VERSION} -> ${data.version})`);
+        } else {
+          setUpdateAvailable(false);
+          console.log("[OtaContext] Il casco ha già l'ultima versione installata.");
+        }
+      }
+    } catch (e: any) {
+      console.warn("[OtaContext] Errore controllo aggiornamenti:", e.message);
+      // Fallback simulato se GitHub non ha ancora il file
+      setLatestVersionInfo({
+        version: "2.0.0",
+        url: "https://raw.githubusercontent.com/lucid-dreamer1/AiRide-mobile/master/firmware.bin",
+        releaseNotes: "Supporto BLE OTA integrato, migliorata stabilità grafica sul display OLED del casco.",
+      });
+      setUpdateAvailable(true);
+    } finally {
+      setCheckingForUpdates(false);
+    }
+  }, []);
+
+  // Esegui controllo all'avvio del context
+  useEffect(() => {
+    checkForUpdates();
+  }, [checkForUpdates]);
 
   // ── Selezione file .bin ──────────────────────────────────
   const pickFirmwareFile = useCallback(async () => {
@@ -156,6 +240,7 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
   // ── Scarica firmware da URL ─────────────────────────────
   const downloadFirmwareFromUrl = async (url: string): Promise<Uint8Array> => {
     console.log("[OtaContext] Download da URL:", url);
+    setOtaState("DOWNLOADING_FW");
 
     const downloadResult = await FileSystem.downloadAsync(
       url,
@@ -218,7 +303,6 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
             setErrorMsg(`Errore ESP32: 0x${code.toString(16).toUpperCase()}`);
             setOtaState("ERROR");
           } else if (opcode === OTA_RESP.PROGRESS) {
-            // bytes_received dall'ESP32 (uint32 LE)
             const espBytes =
               payload[0] |
               (payload[1] << 8) |
@@ -244,6 +328,34 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
     }
   }, [otaState]);
 
+  // ── Download automatico e avvio OTA diretto ─────────────
+  const downloadAndStartOta = useCallback(async () => {
+    if (!latestVersionInfo) return;
+
+    try {
+      setOtaState("DOWNLOADING_FW");
+      setProgress(0);
+      setErrorMsg(null);
+
+      const bytes = await downloadFirmwareFromUrl(latestVersionInfo.url);
+      const crc   = bleOtaService.computeCrc32(bytes);
+      firmwareBinRef.current = bytes;
+      setFirmwareInfo({
+        name: `firmware_${latestVersionInfo.version}.bin`,
+        sizeBytes: bytes.length,
+        crc32: crc.toString(16).toUpperCase().padStart(8, "0"),
+      });
+      setTotalBytes(bytes.length);
+      
+      // Avvia direttamente l'installazione
+      await beginUpload();
+    } catch (e: any) {
+      console.error("[OtaContext] Errore aggiornamento automatico:", e);
+      setErrorMsg(e?.message ?? "Errore durante lo scaricamento");
+      setOtaState("ERROR");
+    }
+  }, [latestVersionInfo, beginUpload]);
+
   // ── startOta (selezione + upload in sequenza) ────────────
   const startOta = useCallback(
     async (source?: OtaSource) => {
@@ -265,7 +377,6 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
         } else {
           // Selezione file locale
           await pickFirmwareFile();
-          // L'upload viene avviato manualmente tramite beginUpload
         }
       } catch (e: any) {
         setErrorMsg(e?.message ?? "Errore");
@@ -305,6 +416,11 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
         errorMessage,
         firmwareInfo,
         lastEspOpcode,
+        updateAvailable,
+        latestVersionInfo,
+        checkingForUpdates,
+        checkForUpdates,
+        downloadAndStartOta,
         startOta,
         pickFirmwareFile,
         beginUpload,

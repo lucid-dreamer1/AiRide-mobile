@@ -70,7 +70,7 @@ export default function SettingsScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showOtaModal, setShowOtaModal] = useState(false);
 
-  const { otaState, firmwareInfo, progress } = useOta();
+  const { otaState, firmwareInfo, progress, updateAvailable, latestVersionInfo } = useOta();
 
   const loadContacts = async () => {
     try {
@@ -448,7 +448,12 @@ export default function SettingsScreen() {
         style={styles.sectionHeader}
         onPress={() => toggleSection("firmware" as any)}
       >
-        <Text style={styles.sectionTitle}>Firmware</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={styles.sectionTitle}>Firmware</Text>
+          {updateAvailable && (
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#1DB954' }} />
+          )}
+        </View>
         <Feather
           name={(openSections as any).firmware ? "chevron-up" : "chevron-down"}
           size={22}
@@ -471,12 +476,29 @@ export default function SettingsScreen() {
             </View>
           </View>
 
+          {/* Messaggio se c'è un aggiornamento disponibile ma non installato */}
+          {updateAvailable && latestVersionInfo && otaState === 'IDLE' && (
+            <View style={{ marginTop: 4, marginBottom: 12, padding: 12, backgroundColor: 'rgba(29,185,84,0.08)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(29,185,84,0.2)' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Feather name="bell" size={15} color="#1DB954" />
+                <Text style={{ color: '#1DB954', fontWeight: '700', fontSize: 13 }}>
+                  Disponibile v{latestVersionInfo.version}!
+                </Text>
+              </View>
+              <Text style={{ color: '#aaa', fontSize: 12, marginTop: 4 }}>
+                Tocca "Aggiorna Firmware" per avviare il download automatico.
+              </Text>
+            </View>
+          )}
+
           {/* Stato OTA breve (se in corso) */}
-          {(otaState === 'UPLOADING' || otaState === 'PREPARING' || otaState === 'VERIFYING') && (
+          {(otaState === 'UPLOADING' || otaState === 'PREPARING' || otaState === 'VERIFYING' || otaState === 'DOWNLOADING_FW') && (
             <View style={{ marginTop: 8, padding: 12, backgroundColor: 'rgba(232,90,42,0.06)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(232,90,42,0.2)' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                 <Feather name="upload-cloud" size={14} color="#E85A2A" />
-                <Text style={{ color: '#E85A2A', fontWeight: '600', fontSize: 13 }}>Aggiornamento in corso... {progress}%</Text>
+                <Text style={{ color: '#E85A2A', fontWeight: '600', fontSize: 13 }}>
+                  {otaState === 'DOWNLOADING_FW' ? 'Scaricamento in cache...' : `Aggiornamento... ${progress}%`}
+                </Text>
               </View>
               <View style={{ height: 4, backgroundColor: '#222', borderRadius: 2 }}>
                 <View style={{ width: `${progress}%` as any, height: 4, backgroundColor: '#E85A2A', borderRadius: 2 }} />
@@ -493,17 +515,16 @@ export default function SettingsScreen() {
             </View>
           )}
 
-          {/* Bottone apri modal OTA */}
           <TouchableOpacity
             style={[styles.testButton, { marginTop: 12 }]}
             onPress={() => setShowOtaModal(true)}
-            disabled={otaState === 'UPLOADING' || otaState === 'PREPARING' || otaState === 'VERIFYING'}
+            disabled={otaState === 'UPLOADING' || otaState === 'PREPARING' || otaState === 'VERIFYING' || otaState === 'DOWNLOADING_FW'}
           >
             <Feather name="upload-cloud" size={18} color="white" />
             <Text style={styles.testButtonText}>
-              {otaState === 'UPLOADING' || otaState === 'PREPARING' || otaState === 'VERIFYING'
+              {otaState === 'UPLOADING' || otaState === 'PREPARING' || otaState === 'VERIFYING' || otaState === 'DOWNLOADING_FW'
                 ? 'Aggiornamento in corso...'
-                : 'Aggiorna Firmware'}
+                : updateAvailable ? 'Nuovo Aggiornamento Disponibile' : 'Aggiorna Firmware'}
             </Text>
           </TouchableOpacity>
         </View>

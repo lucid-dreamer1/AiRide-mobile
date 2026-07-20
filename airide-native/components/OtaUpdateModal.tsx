@@ -4,7 +4,7 @@
 // Design: glassmorphism scuro, animazioni fluide, stato real-time.
 // ------------------------------------------------------------
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Modal,
   View,
@@ -15,6 +15,7 @@ import {
   Easing,
   ScrollView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useOta, OtaState } from "../contexts/OtaContext";
@@ -34,6 +35,7 @@ function stateLabel(state: OtaState): string {
   switch (state) {
     case "IDLE":       return "Pronto";
     case "PREPARING":  return "Lettura file...";
+    case "DOWNLOADING_FW": return "Scaricamento firmware...";
     case "UPLOADING":  return "Trasferimento in corso...";
     case "VERIFYING":  return "Verifica firmware...";
     case "SUCCESS":    return "Aggiornamento completato! 🎉";
@@ -47,6 +49,7 @@ function stateColor(state: OtaState, accent: string): string {
     case "SUCCESS":  return "#1DB954";
     case "ERROR":    return "#E74C3C";
     case "ABORTED":  return "#F39C12";
+    case "DOWNLOADING_FW":
     case "UPLOADING":
     case "VERIFYING":
     case "PREPARING": return accent;
@@ -126,6 +129,11 @@ export default function OtaUpdateModal({ visible, onClose }: OtaUpdateModalProps
     totalBytes,
     errorMessage,
     firmwareInfo,
+    updateAvailable,
+    latestVersionInfo,
+    checkingForUpdates,
+    checkForUpdates,
+    downloadAndStartOta,
     pickFirmwareFile,
     beginUpload,
     abortOta,
@@ -133,10 +141,11 @@ export default function OtaUpdateModal({ visible, onClose }: OtaUpdateModalProps
   } = useOta();
 
   const { connected, setOtaInProgress } = useHelmet();
+  const [showManualPicker, setShowManualPicker] = useState(false);
 
   // Sincronizza flag pausa navigazione con lo stato OTA
   useEffect(() => {
-    const inProgress = otaState === "UPLOADING" || otaState === "VERIFYING" || otaState === "PREPARING";
+    const inProgress = otaState === "UPLOADING" || otaState === "VERIFYING" || otaState === "PREPARING" || otaState === "DOWNLOADING_FW";
     setOtaInProgress(inProgress);
   }, [otaState, setOtaInProgress]);
 
@@ -153,7 +162,7 @@ export default function OtaUpdateModal({ visible, onClose }: OtaUpdateModalProps
 
   const accent = themeColors.accent ?? "#E85A2A";
   const currentColor = stateColor(otaState, accent);
-  const isActive = otaState === "UPLOADING" || otaState === "VERIFYING" || otaState === "PREPARING";
+  const isActive = otaState === "UPLOADING" || otaState === "VERIFYING" || otaState === "PREPARING" || otaState === "DOWNLOADING_FW";
   const isDone   = otaState === "SUCCESS" || otaState === "ERROR" || otaState === "ABORTED";
 
   const handleClose = () => {
@@ -161,6 +170,7 @@ export default function OtaUpdateModal({ visible, onClose }: OtaUpdateModalProps
       abortOta();
     }
     resetOta();
+    setShowManualPicker(false);
     onClose();
   };
 
@@ -203,47 +213,125 @@ export default function OtaUpdateModal({ visible, onClose }: OtaUpdateModalProps
               </Text>
             </View>
 
-            {/* Card file info */}
-            {firmwareInfo ? (
-              <View style={[styles.fileCard, { backgroundColor: themeColors.bg ?? "#111" }]}>
-                <Feather name="file" size={28} color={accent} style={{ marginBottom: 8 }} />
-                <Text style={[styles.fileName, { color: themeColors.text }]} numberOfLines={1}>
-                  {firmwareInfo.name}
-                </Text>
-                <View style={styles.fileMetaRow}>
-                  <View style={styles.fileMeta}>
-                    <Text style={styles.fileMetaLabel}>Dimensione</Text>
-                    <Text style={[styles.fileMetaValue, { color: themeColors.text }]}>
-                      {formatBytes(firmwareInfo.sizeBytes)}
-                    </Text>
+            {/* Check Aggiornamento Remoto Automatico */}
+            {!isActive && !isDone && !firmwareInfo && !showManualPicker && (
+              <View style={[styles.updateBox, { backgroundColor: themeColors.bg ?? "#111" }]}>
+                {checkingForUpdates ? (
+                  <View style={{ padding: 20, alignItems: "center", gap: 10 }}>
+                    <ActivityIndicator size="small" color={accent} />
+                    <Text style={{ color: themeColors.textMuted, fontSize: 13 }}>Controllo aggiornamenti online...</Text>
                   </View>
-                  <View style={styles.fileMeta}>
-                    <Text style={styles.fileMetaLabel}>CRC32</Text>
-                    <Text style={[styles.fileMetaValue, { color: themeColors.text }]}>
-                      {firmwareInfo.crc32}
-                    </Text>
+                ) : updateAvailable && latestVersionInfo ? (
+                  <View style={{ gap: 12 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Feather name="bell" size={18} color="#1DB954" />
+                      <Text style={[styles.updateTitle, { color: themeColors.text }]}>
+                        Aggiornamento Disponibile! (v{latestVersionInfo.version})
+                      </Text>
+                    </View>
+                    
+                    <View style={[styles.releaseNotesBox, { backgroundColor: themeColors.card }]}>
+                      <Text style={[styles.releaseNotesTitle, { color: themeColors.text }]}>Note di rilascio:</Text>
+                      <Text style={[styles.releaseNotesText, { color: themeColors.textMuted }]}>
+                        {latestVersionInfo.releaseNotes}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.primaryBtn, { backgroundColor: "#1DB954" }]}
+                      onPress={downloadAndStartOta}
+                      disabled={!connected}
+                      activeOpacity={0.8}
+                    >
+                      <Feather name="download" size={18} color="white" />
+                      <Text style={styles.primaryBtnText}>Scarica ed Installa</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      onPress={() => setShowManualPicker(true)}
+                      style={{ alignSelf: "center", marginTop: 6 }}
+                    >
+                      <Text style={{ color: accent, fontSize: 12, textDecorationLine: "underline" }}>
+                        Aggiorna manualmente con file .bin locale
+                      </Text>
+                    </TouchableOpacity>
                   </View>
-                </View>
+                ) : (
+                  <View style={{ padding: 10, alignItems: "center", gap: 12 }}>
+                    <Feather name="check-circle" size={24} color="#1DB954" />
+                    <Text style={{ color: themeColors.text, fontWeight: "600" }}>Il firmware è aggiornato!</Text>
+                    <Text style={{ color: themeColors.textMuted, fontSize: 12, textAlign: "center" }}>
+                      Non ci sono nuovi aggiornamenti sul server al momento.
+                    </Text>
+
+                    <TouchableOpacity 
+                      onPress={() => setShowManualPicker(true)}
+                      style={{ marginTop: 10 }}
+                    >
+                      <Text style={{ color: accent, fontSize: 12, textDecorationLine: "underline" }}>
+                        Carica comunque un firmware locale (.bin)
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
-            ) : (
-              /* Placeholder selezione file */
-              <TouchableOpacity
-                style={[styles.fileDropzone, { borderColor: accent + "66" }]}
-                onPress={pickFirmwareFile}
-                disabled={isActive || !connected}
-                activeOpacity={0.7}
-              >
-                <Feather name="upload" size={32} color={accent} style={{ marginBottom: 10 }} />
-                <Text style={[styles.dropzoneText, { color: themeColors.text }]}>
-                  Seleziona file .bin
-                </Text>
-                <Text style={[styles.dropzoneSubtext, { color: themeColors.textMuted }]}>
-                  Tocca per aprire il file manager
-                </Text>
-              </TouchableOpacity>
             )}
 
-            {/* Sezione progresso */}
+            {/* Caricamento File Locale (se attivato manualmente o se non ci sono updates) */}
+            {(showManualPicker || firmwareInfo) && !isActive && !isDone && (
+              <View style={{ gap: 12 }}>
+                {firmwareInfo ? (
+                  <View style={[styles.fileCard, { backgroundColor: themeColors.bg ?? "#111" }]}>
+                    <Feather name="file" size={28} color={accent} style={{ marginBottom: 8 }} />
+                    <Text style={[styles.fileName, { color: themeColors.text }]} numberOfLines={1}>
+                      {firmwareInfo.name}
+                    </Text>
+                    <View style={styles.fileMetaRow}>
+                      <View style={styles.fileMeta}>
+                        <Text style={styles.fileMetaLabel}>Dimensione</Text>
+                        <Text style={[styles.fileMetaValue, { color: themeColors.text }]}>
+                          {formatBytes(firmwareInfo.sizeBytes)}
+                        </Text>
+                      </View>
+                      <View style={styles.fileMeta}>
+                        <Text style={styles.fileMetaLabel}>CRC32</Text>
+                        <Text style={[styles.fileMetaValue, { color: themeColors.text }]}>
+                          {firmwareInfo.crc32}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.fileDropzone, { borderColor: accent + "66" }]}
+                    onPress={pickFirmwareFile}
+                    disabled={isActive || !connected}
+                    activeOpacity={0.7}
+                  >
+                    <Feather name="upload" size={32} color={accent} style={{ marginBottom: 10 }} />
+                    <Text style={[styles.dropzoneText, { color: themeColors.text }]}>
+                      Seleziona file .bin locale
+                    </Text>
+                    <Text style={[styles.dropzoneSubtext, { color: themeColors.textMuted }]}>
+                      Tocca per aprire il file manager
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {updateAvailable && (
+                  <TouchableOpacity 
+                    onPress={() => setShowManualPicker(false)}
+                    style={{ alignSelf: "center", marginTop: 4 }}
+                  >
+                    <Text style={{ color: "#1DB954", fontSize: 12, textDecorationLine: "underline" }}>
+                      Torna all'aggiornamento automatico consigliato
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {/* Sezione progresso (Download o Upload) */}
             {(isActive || isDone) && (
               <View style={styles.progressSection}>
                 {/* Stato label */}
@@ -262,9 +350,15 @@ export default function OtaUpdateModal({ visible, onClose }: OtaUpdateModalProps
 
                 {/* Byte counter */}
                 <View style={styles.byteRow}>
-                  <Text style={[styles.byteText, { color: themeColors.textMuted }]}>
-                    {formatBytes(bytesSent)} / {formatBytes(totalBytes)}
-                  </Text>
+                  {otaState === "DOWNLOADING_FW" ? (
+                    <Text style={[styles.byteText, { color: themeColors.textMuted }]}>
+                      Scaricamento dei pacchetti in cache...
+                    </Text>
+                  ) : (
+                    <Text style={[styles.byteText, { color: themeColors.textMuted }]}>
+                      {formatBytes(bytesSent)} / {formatBytes(totalBytes)}
+                    </Text>
+                  )}
                   <Text style={[styles.percentText, { color: currentColor }]}>
                     {progress}%
                   </Text>
@@ -298,21 +392,7 @@ export default function OtaUpdateModal({ visible, onClose }: OtaUpdateModalProps
                   activeOpacity={0.8}
                 >
                   <Feather name="zap" size={18} color="white" />
-                  <Text style={styles.primaryBtnText}>Avvia aggiornamento</Text>
-                </TouchableOpacity>
-              )}
-
-              {!isActive && !isDone && (
-                <TouchableOpacity
-                  style={[styles.secondaryBtn, { borderColor: accent + "66" }]}
-                  onPress={pickFirmwareFile}
-                  disabled={!connected}
-                  activeOpacity={0.7}
-                >
-                  <Feather name="folder" size={16} color={accent} />
-                  <Text style={[styles.secondaryBtnText, { color: accent }]}>
-                    {firmwareInfo ? "Cambia file" : "Scegli file .bin"}
-                  </Text>
+                  <Text style={styles.primaryBtnText}>Avvia installazione</Text>
                 </TouchableOpacity>
               )}
 
@@ -330,12 +410,16 @@ export default function OtaUpdateModal({ visible, onClose }: OtaUpdateModalProps
               {isDone && (
                 <TouchableOpacity
                   style={[styles.secondaryBtn, { borderColor: accent + "66" }]}
-                  onPress={resetOta}
+                  onPress={() => {
+                    resetOta();
+                    setShowManualPicker(false);
+                    checkForUpdates();
+                  }}
                   activeOpacity={0.7}
                 >
                   <Feather name="refresh-cw" size={16} color={accent} />
                   <Text style={[styles.secondaryBtnText, { color: accent }]}>
-                    Nuovo aggiornamento
+                    Riprova o controlla aggiornamenti
                   </Text>
                 </TouchableOpacity>
               )}
@@ -361,7 +445,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingTop: 12,
     maxHeight: "90%",
-    // Glassmorphism-like via elevation + borderWidth
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     elevation: 24,
@@ -460,6 +543,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     fontVariant: ["tabular-nums"],
+  },
+  updateBox: {
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  updateTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    flex: 1,
+  },
+  releaseNotesBox: {
+    padding: 14,
+    borderRadius: 14,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.04)",
+  },
+  releaseNotesTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  releaseNotesText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   progressSection: {
     gap: 10,
