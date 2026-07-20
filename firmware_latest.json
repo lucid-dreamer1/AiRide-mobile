@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0",
+  "version": "2.1.0",
   "url": "https://raw.githubusercontent.com/lucid-dreamer1/AiRide-mobile/master/firmware.bin",
-  "releaseNotes": "Aggiunto supporto BLE OTA e ottimizzazioni grafiche per il display OLED del casco."
+  "releaseNotes": "TEST VISIVO: Modificata la schermata di accensione. Ora il casco mostra \"AiRide v2.1\" anziché solo \"AiRide\" per confermare l'installazione."
 }
