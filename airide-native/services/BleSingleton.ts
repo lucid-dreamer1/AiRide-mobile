@@ -23,33 +23,34 @@ class BleService {
       return;
     }
 
-    const SERVICE_UUID = "0000FFE0-0000-1000-8000-00805F9B34FB";
-    const CHARACTERISTIC_UUID = "0000FFE1-0000-1000-8000-00805F9B34FB";
+    // UUID allineati con l'ESP32
+    const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+    const CHARACTERISTIC_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
     try {
-      // Assicurati che il testo finisca con un a-capo per l'Arduino
+      // Assicurati che il testo finisca con un a-capo per forzare la chiusura (opzionale con il timeout ESP)
       const fullText = text.endsWith("\n") ? text : text + "\n";
       
-      // Il BLE standard accetta massimo 20 byte per pacchetto.
-      // Dividiamo la stringa in chunk da 20 caratteri e li inviamo in sequenza.
-      // In questo modo l'HM-10 li ricompone in seriale senza perdere dati né il \n finale.
+      // Continuiamo a usare la frammentazione a 20 byte che è universale
+      // ed estremamente affidabile per evitare drop di pacchetti BLE.
       for (let i = 0; i < fullText.length; i += 20) {
         const chunk = fullText.substring(i, i + 20);
         const msg = base64.encode(chunk);
 
         await this.device.writeCharacteristicWithoutResponseForService(
           SERVICE_UUID,
-          CHARACTERISTIC_UUID,
+          CHARACTERISTIC_RX_UUID,
           msg
         );
         
-        // Piccolo delay per evitare che lo stack BLE o il modulo hardware scartino i pacchetti veloci
+        // Piccolo delay (15-20ms) per evitare l'ingorgo dello stack BLE
         await new Promise(r => setTimeout(r, 20));
       }
 
       console.log("[BleSingleton] 📤 Inviato al casco:", text);
     } catch (err) {
       console.error("[BleSingleton] Errore invio dati:", err);
+      // Se l'errore persiste, potrebbe essere necessario chiamare this.manager.cancelDeviceConnection
       throw err;
     }
   }

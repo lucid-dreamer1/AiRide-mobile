@@ -24,6 +24,9 @@ type HelmetContextType = {
   scanning: boolean;
   connected: boolean;
   error: string | null;
+  /** True durante un aggiornamento OTA: blocca l'invio di dati di navigazione */
+  isOtaInProgress: boolean;
+  setOtaInProgress: (v: boolean) => void;
   scanAndConnect: () => Promise<void>;
   sendToHelmet: (text: string) => Promise<void>;
   disconnect: () => Promise<void>;
@@ -34,6 +37,8 @@ const HelmetContext = createContext<HelmetContextType>({
   scanning: false,
   connected: false,
   error: null,
+  isOtaInProgress: false,
+  setOtaInProgress: () => {},
   scanAndConnect: async () => {},
   sendToHelmet: async () => {},
   disconnect: async () => {},
@@ -76,6 +81,7 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isOtaInProgress, setOtaInProgress] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -97,7 +103,7 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
       setTimeout(() => {
         const fakeDevice: Device = {
           id: "MOCK-DEVICE",
-          name: "DSD TECH (MOCK)",
+          name: "AiRide Helmet (MOCK)",
           isConnected: async () => true,
           connect: async () => fakeDevice,
           cancelConnection: async () => {},
@@ -150,12 +156,15 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
         if (!found) return;
 
         const name = found.name ?? "";
-        const targetNames = ["DSD TECH", "DSD-TECH", "HM-10", "68:5E:1C:33:FB:EB"];
+        // ESP32-S3 con firmware AiRide
+        const targetNames = ["AiRide Helmet", "AiRide", "ESP32"];
         const nameMatches = targetNames.some((n) => name.includes(n));
 
+        // Nordic UART Service UUID usato dall'ESP32
+        const NUS_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
         const serviceMatches =
           found.serviceUUIDs?.some((s) =>
-            ["ffe0", "ffe1"].includes(s.replace(/-/g, "").toLowerCase())
+            s.toLowerCase() === NUS_UUID
           ) || false;
 
         if (nameMatches || serviceMatches) {
@@ -204,6 +213,12 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // ⚠️ OTA in corso: scarta silenziosamente i dati di navigazione
+      if (isOtaInProgress) {
+        console.log("[HelmetContext] ⚠️ OTA in corso, invio navigazione sospeso");
+        return;
+      }
+
       if (!device || !connected) {
         console.log("❌ Nessun casco connesso");
         return;
@@ -215,7 +230,7 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
         setError("Errore invio dati");
       }
     },
-    [device, connected]
+    [device, connected, isOtaInProgress]
   );
 
   // ------------------------------------------------------------
@@ -248,6 +263,8 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
         scanning,
         connected,
         error,
+        isOtaInProgress,
+        setOtaInProgress,
         scanAndConnect,
         sendToHelmet,
         disconnect,

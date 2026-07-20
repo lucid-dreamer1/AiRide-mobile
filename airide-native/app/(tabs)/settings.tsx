@@ -30,6 +30,8 @@ import Toast from "react-native-toast-message";
 import { NavigationStore } from "@/services/NavigationStore";
 import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
+import { useOta } from "@/contexts/OtaContext";
+import OtaUpdateModal from "@/components/OtaUpdateModal";
 
 // Abilita animazioni su Android
 if (Platform.OS === "android") {
@@ -60,11 +62,15 @@ export default function SettingsScreen() {
     voice: true, // Voice Assistant section
     special: true,
     airescue: true,
+    firmware: true,
   });
 
   const [contactsModalVisible, setContactsModalVisible] = useState(false);
   const [contactsList, setContactsList] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showOtaModal, setShowOtaModal] = useState(false);
+
+  const { otaState, firmwareInfo, progress } = useOta();
 
   const loadContacts = async () => {
     try {
@@ -434,6 +440,78 @@ export default function SettingsScreen() {
 
 
       
+      {/* -------------------------- */}
+      {/* FIRMWARE OTA */}
+      {/* -------------------------- */}
+
+      <TouchableOpacity
+        style={styles.sectionHeader}
+        onPress={() => toggleSection("firmware" as any)}
+      >
+        <Text style={styles.sectionTitle}>Firmware</Text>
+        <Feather
+          name={(openSections as any).firmware ? "chevron-up" : "chevron-down"}
+          size={22}
+          color="#E85A2A"
+        />
+      </TouchableOpacity>
+
+      {(openSections as any).firmware && (
+        <View style={styles.sectionContent}>
+          {/* Info firmware corrente */}
+          <View style={[styles.switchContainer, { borderBottomWidth: 0 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchLabel}>Versione firmware</Text>
+              <Text style={styles.switchDesc}>
+                Aggiorna il firmware del casco via Bluetooth.
+              </Text>
+            </View>
+            <View style={{ backgroundColor: 'rgba(232,90,42,0.1)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#E85A2A' }}>
+              <Text style={{ color: '#E85A2A', fontSize: 12, fontWeight: '700' }}>OTA</Text>
+            </View>
+          </View>
+
+          {/* Stato OTA breve (se in corso) */}
+          {(otaState === 'UPLOADING' || otaState === 'PREPARING' || otaState === 'VERIFYING') && (
+            <View style={{ marginTop: 8, padding: 12, backgroundColor: 'rgba(232,90,42,0.06)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(232,90,42,0.2)' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <Feather name="upload-cloud" size={14} color="#E85A2A" />
+                <Text style={{ color: '#E85A2A', fontWeight: '600', fontSize: 13 }}>Aggiornamento in corso... {progress}%</Text>
+              </View>
+              <View style={{ height: 4, backgroundColor: '#222', borderRadius: 2 }}>
+                <View style={{ width: `${progress}%` as any, height: 4, backgroundColor: '#E85A2A', borderRadius: 2 }} />
+              </View>
+            </View>
+          )}
+
+          {otaState === 'SUCCESS' && (
+            <View style={{ marginTop: 8, padding: 12, backgroundColor: 'rgba(29,185,84,0.08)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(29,185,84,0.3)' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Feather name="check-circle" size={14} color="#1DB954" />
+                <Text style={{ color: '#1DB954', fontWeight: '600', fontSize: 13 }}>Firmware aggiornato con successo!</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Bottone apri modal OTA */}
+          <TouchableOpacity
+            style={[styles.testButton, { marginTop: 12 }]}
+            onPress={() => setShowOtaModal(true)}
+            disabled={otaState === 'UPLOADING' || otaState === 'PREPARING' || otaState === 'VERIFYING'}
+          >
+            <Feather name="upload-cloud" size={18} color="white" />
+            <Text style={styles.testButtonText}>
+              {otaState === 'UPLOADING' || otaState === 'PREPARING' || otaState === 'VERIFYING'
+                ? 'Aggiornamento in corso...'
+                : 'Aggiorna Firmware'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* MODAL OTA */}
+      <OtaUpdateModal visible={showOtaModal} onClose={() => setShowOtaModal(false)} />
+
       {/* MODAL CONTATTI */}
       <Modal visible={contactsModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setContactsModalVisible(false)}>
         <View style={{ flex: 1, backgroundColor: '#0a0a0a', paddingTop: Platform.OS === 'ios' ? 20 : 50 }}>

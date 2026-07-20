@@ -16,6 +16,7 @@ import { AuthProvider } from "../services/AuthContext";
 import { NavigationProvider } from "../navigation/NavigationContext";
 import { HelmetProvider } from "@/contexts/HelmetContext";
 import { VoiceSettingsProvider } from "@/contexts/VoiceSettingsContext";
+import { OtaProvider } from "@/contexts/OtaContext";
 
 import Toast from "react-native-toast-message";
 
@@ -107,34 +108,36 @@ export default function RootLayout() {
 
   return (
     <HelmetProvider>
-      <NavigationProvider>
-        <AuthProvider>
-          {/* ⭐ Voice Settings Provider */}
-          <VoiceSettingsProvider>
-            {/* ⭐ 1) Theme globale AiRide */}
-            <ThemeProvider>
-              {/* ⭐ AiRescue Provider */}
-              <AiRescueProvider>
-                {/* ⭐ 2) Navigation Theme sincronizzato col tuo tema */}
-                <NavigationThemeWrapper>
-                  <>
-                    <Stack>
-                      <Stack.Screen name="login" options={{ headerShown: false }} />
-                      <Stack.Screen name="register" options={{ headerShown: false }} />
-                      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                      <Stack.Screen name="modal" options={{ presentation: "modal" }} />
-                    </Stack>
+      <OtaProvider>
+        <NavigationProvider>
+          <AuthProvider>
+            {/* ⭐ Voice Settings Provider */}
+            <VoiceSettingsProvider>
+              {/* ⭐ 1) Theme globale AiRide */}
+              <ThemeProvider>
+                {/* ⭐ AiRescue Provider */}
+                <AiRescueProvider>
+                  {/* ⭐ 2) Navigation Theme sincronizzato col tuo tema */}
+                  <NavigationThemeWrapper>
+                    <>
+                      <Stack>
+                        <Stack.Screen name="login" options={{ headerShown: false }} />
+                        <Stack.Screen name="register" options={{ headerShown: false }} />
+                        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                        <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+                      </Stack>
 
-                    <StatusBar style="light" />
+                      <StatusBar style="light" />
 
-                    <Toast />
-                  </>
-                </NavigationThemeWrapper>
-              </AiRescueProvider>
-            </ThemeProvider>
-          </VoiceSettingsProvider>
-        </AuthProvider>
-      </NavigationProvider>
+                      <Toast />
+                    </>
+                  </NavigationThemeWrapper>
+                </AiRescueProvider>
+              </ThemeProvider>
+            </VoiceSettingsProvider>
+          </AuthProvider>
+        </NavigationProvider>
+      </OtaProvider>
     </HelmetProvider>
   );
 }
