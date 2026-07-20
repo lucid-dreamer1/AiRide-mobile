@@ -17,7 +17,7 @@ import { bleService } from "../services/BleSingleton";
 // const manager = new BleManager(); // Rimosso: usa Singleton
 
 // 🟦 ATTIVA/DISATTIVA MOCK
-const MOCK_BLE = false;
+const MOCK_BLE = true;
 
 type HelmetContextType = {
   device: Device | null;
@@ -101,14 +101,99 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
       setError(null);
 
       setTimeout(() => {
+        let currentListener: ((error: any, characteristic: any) => void) | null = null;
+        let bytesReceived = 0;
+        let expectedBytes = 0;
+
         const fakeDevice: Device = {
           id: "MOCK-DEVICE",
           name: "AiRide Helmet (MOCK)",
           isConnected: async () => true,
           connect: async () => fakeDevice,
-          cancelConnection: async () => {},
+          cancelConnection: async () => {
+            console.log("🟦 MOCK: Casco disconnesso");
+          },
           discoverAllServicesAndCharacteristics: async () => fakeDevice,
-          writeCharacteristicWithoutResponseForService: async () => {}, 
+          
+          requestMTU: async (mtu: number) => {
+            console.log(`🟦 MOCK: Richiesto MTU ${mtu}, concedo 256`);
+            return { mtu: 256 };
+          },
+
+          monitorCharacteristicForService: (serviceUUID: string, characteristicUUID: string, listener: any) => {
+            console.log(`🟦 MOCK: Registrato monitor per ${characteristicUUID}`);
+            currentListener = listener;
+            return {
+              remove: () => {
+                console.log(`🟦 MOCK: Rimosso monitor per ${characteristicUUID}`);
+                currentListener = null;
+              }
+            };
+          },
+
+          writeCharacteristicWithResponseForService: async (serviceUUID: string, characteristicUUID: string, base64Value: string) => {
+            try {
+              const decoded = base64.decode(base64Value);
+              const bytes = Array.from(decoded).map(c => c.charCodeAt(0));
+              const opcode = bytes[0];
+              console.log(`🟦 MOCK: Ricevuto comando Control OTA, Opcode: 0x${opcode.toString(16).toUpperCase()}`);
+
+              if (opcode === 0x01) { // CMD_START
+                expectedBytes = bytes[1] | (bytes[2] << 8) | (bytes[3] << 16) | (bytes[4] << 24);
+                bytesReceived = 0;
+                console.log(`🟦 MOCK: Inizializzato upload per ${expectedBytes} byte`);
+                
+                // Simula OK_START dopo 400ms
+                setTimeout(() => {
+                  if (currentListener) {
+                    const responseB64 = base64.encode(String.fromCharCode(0x11)); // RESP_OK_START
+                    currentListener(null, { value: responseB64 });
+                  }
+                }, 400);
+              } 
+              else if (opcode === 0x02) { // CMD_END
+                console.log(`🟦 MOCK: Ricevuto CMD_END, avvio verifica...`);
+                
+                // Simula SUCCESS dopo 800ms
+                setTimeout(() => {
+                  if (currentListener) {
+                    const responseB64 = base64.encode(String.fromCharCode(0x13)); // RESP_SUCCESS
+                    currentListener(null, { value: responseB64 });
+                  }
+                }, 800);
+              }
+              else if (opcode === 0x03) { // CMD_ABORT
+                console.log(`🟦 MOCK: Ricevuto CMD_ABORT`);
+                bytesReceived = 0;
+              }
+            } catch (e) {
+              console.error("Errore decoding mock write", e);
+            }
+            return {} as any;
+          },
+
+          writeCharacteristicWithoutResponseForService: async (serviceUUID: string, characteristicUUID: string, base64Value: string) => {
+            try {
+              const decoded = base64.decode(base64Value);
+              bytesReceived += decoded.length;
+
+              // Invia un aggiornamento di PROGRESS finto ogni 15% circa
+              const progressThreshold = Math.floor(expectedBytes / 6);
+              if (progressThreshold > 0 && bytesReceived % progressThreshold < decoded.length) {
+                if (currentListener) {
+                  const payload = String.fromCharCode(
+                    0x12, // RESP_PROGRESS
+                    (bytesReceived & 0xFF),
+                    ((bytesReceived >> 8) & 0xFF),
+                    ((bytesReceived >> 16) & 0xFF),
+                    ((bytesReceived >> 24) & 0xFF)
+                  );
+                  currentListener(null, { value: base64.encode(payload) });
+                }
+              }
+            } catch (e) {}
+            return {} as any;
+          },
         } as any;
 
         setDevice(fakeDevice);
