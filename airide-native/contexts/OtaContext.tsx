@@ -313,10 +313,10 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      // Se siamo qui senza SUCCESS via notify, consideriamo VERIFYING
-      if (otaState !== "SUCCESS" && otaState !== "ERROR") {
-        setOtaState("VERIFYING");
-      }
+      // Se startOtaUpdate termina senza lanciare eccezioni, significa che ha ricevuto
+      // con successo la notifica OTA_RESP.SUCCESS e il timeout non è scattato.
+      setOtaState("SUCCESS");
+      setProgress(100);
     } catch (e: any) {
       if (e?.message?.includes("annullato")) {
         setOtaState("ABORTED");
