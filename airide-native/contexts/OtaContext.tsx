@@ -127,8 +127,14 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
   const [currentHelmetVersion, setCurrentHelmetVersion] = useState<string>("1.0.0");
   const STORAGE_KEY_FW_VERSION = "@airide_installed_fw_version";
 
-  // Sincronizza lo stato OTA con il background navigation service
+  // Sincronizza lo stato OTA con il background navigation service (evita invii spuri al mount iniziale)
+  const prevOtaStateRef = useRef<OtaState>("IDLE");
   useEffect(() => {
+    if (prevOtaStateRef.current === "IDLE" && otaState === "IDLE") {
+      return; // Non emettere al caricamento iniziale dell'app quando lo stato è IDLE
+    }
+    prevOtaStateRef.current = otaState;
+
     import("react-native").then(({ DeviceEventEmitter }) => {
       const inProgress =
         otaState === "PREPARING" ||
