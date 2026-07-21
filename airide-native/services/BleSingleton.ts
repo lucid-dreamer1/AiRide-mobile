@@ -28,6 +28,14 @@ class BleService {
     const CHARACTERISTIC_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
     try {
+      // Verifica rapida dello stato di connessione se disponibile
+      const connected = await this.device.isConnected().catch(() => false);
+      if (!connected) {
+        console.warn("[BleSingleton] Dispositivo disconnesso, annullo invio");
+        this.device = null;
+        return;
+      }
+
       // Assicurati che il testo finisca con un a-capo per forzare la chiusura (opzionale con il timeout ESP)
       const fullText = text.endsWith("\n") ? text : text + "\n";
       
@@ -48,10 +56,9 @@ class BleService {
       }
 
       console.log("[BleSingleton] 📤 Inviato al casco:", text);
-    } catch (err) {
-      console.error("[BleSingleton] Errore invio dati:", err);
-      // Se l'errore persiste, potrebbe essere necessario chiamare this.manager.cancelDeviceConnection
-      throw err;
+    } catch (err: any) {
+      console.warn("[BleSingleton] Errore invio dati (dispositivo disconnesso?):", err?.message ?? err);
+      this.device = null;
     }
   }
 

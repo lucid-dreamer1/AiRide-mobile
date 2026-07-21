@@ -1,5 +1,5 @@
 {
-  "version": "2.1.0",
+  "version": "2.2.0",
   "url": "https://raw.githubusercontent.com/lucid-dreamer1/AiRide-mobile/master/firmware.bin",
-  "releaseNotes": "TEST VISIVO: Modificata la schermata di accensione. Ora il casco mostra \"AiRide v2.1\" anziché solo \"AiRide\" per confermare l'installazione."
+  "releaseNotes": "Versione 2.2.0 per Test OTA: Nuova versione firmware per la verifica automatica del flusso di aggiornamento da remoto."
 }

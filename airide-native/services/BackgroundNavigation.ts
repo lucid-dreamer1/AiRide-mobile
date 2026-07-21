@@ -767,9 +767,13 @@ const navigationTask = async (taskDataArguments: any) => {
 
                     console.log(`[Background] 🟢 BRAIN LOOP | Packet: ${packet}`);
     
-                    // 4. INVIA AL CASCO
-                    if (bleService.getDevice()) {
-                         await bleService.sendToHelmet(packet);
+                    // 4. INVIA AL CASCO (solo se non in corso aggiornamento OTA)
+                    if (!isOtaActive && bleService.getDevice()) {
+                         try {
+                             await bleService.sendToHelmet(packet);
+                         } catch (bleErr) {
+                             console.warn('[Background] Errore invio pacchetto BLE:', bleErr);
+                         }
                     }
                 } // END if(isNavigating)
 

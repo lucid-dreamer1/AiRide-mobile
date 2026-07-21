@@ -102,6 +102,7 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
 
       setTimeout(() => {
         let currentListener: ((error: any, characteristic: any) => void) | null = null;
+        let onDisconnectedListener: ((error: any, device: any) => void) | null = null;
         let bytesReceived = 0;
         let expectedBytes = 0;
 
@@ -112,6 +113,18 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
           connect: async () => fakeDevice,
           cancelConnection: async () => {
             console.log("🟦 MOCK: Casco disconnesso");
+            if (onDisconnectedListener) {
+              onDisconnectedListener(null, fakeDevice);
+            }
+          },
+          onDisconnected: (listener: any) => {
+            console.log("🟦 MOCK: Registrato listener onDisconnected");
+            onDisconnectedListener = listener;
+            return {
+              remove: () => {
+                onDisconnectedListener = null;
+              }
+            };
           },
           discoverAllServicesAndCharacteristics: async () => fakeDevice,
           
@@ -160,6 +173,17 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
                     const responseB64 = base64.encode(String.fromCharCode(0x13)); // RESP_SUCCESS
                     currentListener(null, { value: responseB64 });
                   }
+
+                  // 🔌 SIMULA IL RIAVVIO HARDWARE ESP32 DOPO 400ms DALLA NOTIFICA SUCCESS
+                  setTimeout(() => {
+                    console.log("🟦 MOCK: Simulazione riavvio ESP32 post-OTA (disconnessione hardware)...");
+                    if (onDisconnectedListener) {
+                      onDisconnectedListener(new Error("MOCK: Device disconnected (ESP32 reboot)"), fakeDevice);
+                    }
+                    setDevice(null);
+                    bleService.setConnectedDevice(null);
+                    setConnected(false);
+                  }, 400);
                 }, 800);
               }
               else if (opcode === 0x03) { // CMD_ABORT
@@ -260,6 +284,14 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
           try {
             const connectedDevice = await found.connect();
             await connectedDevice.discoverAllServicesAndCharacteristics();
+
+            // Sottoscrizione all'evento di disconnessione (gestisce anche il riavvio post-OTA)
+            connectedDevice.onDisconnected((disconnErr, dev) => {
+              console.log("[HelmetContext] 🔌 Dispositivo disconnesso:", dev?.id ?? dev?.name, disconnErr?.message ?? "");
+              setDevice(null);
+              bleService.setConnectedDevice(null);
+              setConnected(false);
+            });
 
             setDevice(connectedDevice);
             bleService.setConnectedDevice(connectedDevice); // <--- Sync Singleton

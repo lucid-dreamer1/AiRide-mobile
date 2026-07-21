@@ -258,13 +258,16 @@ class BleOtaService {
   // ── Annulla subscription notify ───────────────────────────
   private _unsubscribeFromControl() {
     if (this.notifySubscription) {
+      const sub = this.notifySubscription;
+      this.notifySubscription = null;
       try {
-        this.notifySubscription.remove();
+        if (typeof sub?.remove === "function") {
+          sub.remove();
+        }
       } catch (e) {
         // Il device potrebbe essersi già disconnesso (riavvio ESP32 post-OTA)
         console.log("[BleOtaService] Subscription cleanup (dispositivo disconnesso):", e);
       }
-      this.notifySubscription = null;
     }
   }
 

@@ -206,10 +206,14 @@ export default function OtaUpdateModal({ visible, onClose }: OtaUpdateModalProps
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body}>
 
             {/* Stato connessione */}
-            <View style={[styles.connectionBadge, { borderColor: connected ? "#1DB954" : "#E74C3C" }]}>
-              <View style={[styles.connectionDot, { backgroundColor: connected ? "#1DB954" : "#E74C3C" }]} />
+            <View style={[styles.connectionBadge, { borderColor: connected ? "#1DB954" : (otaState === "SUCCESS" ? "#F39C12" : "#E74C3C") }]}>
+              <View style={[styles.connectionDot, { backgroundColor: connected ? "#1DB954" : (otaState === "SUCCESS" ? "#F39C12" : "#E74C3C") }]} />
               <Text style={[styles.connectionText, { color: themeColors.text }]}>
-                {connected ? "Casco connesso" : "Casco non connesso — connettiti prima"}
+                {connected
+                  ? "Casco connesso"
+                  : otaState === "SUCCESS"
+                  ? "Casco in riavvio post-aggiornamento..."
+                  : "Casco non connesso — connettiti prima"}
               </Text>
             </View>
 

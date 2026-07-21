@@ -123,6 +123,10 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
   // Buffer del firmware in memoria (Uint8Array)
   const firmwareBinRef = useRef<Uint8Array | null>(null);
 
+  // Ref per tracciare lo stato e l'opcode in tempo reale (evita bug di closure in async callbacks)
+  const otaStateRef = useRef<OtaState>(otaState);
+  const lastEspOpcodeRef = useRef<number | null>(null);
+
   // Versione corrente del firmware (persistita in AsyncStorage)
   const [currentHelmetVersion, setCurrentHelmetVersion] = useState<string>("1.0.0");
   const STORAGE_KEY_FW_VERSION = "@airide_installed_fw_version";
@@ -130,6 +134,8 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
   // Sincronizza lo stato OTA con il background navigation service (evita invii spuri al mount iniziale)
   const prevOtaStateRef = useRef<OtaState>("IDLE");
   useEffect(() => {
+    otaStateRef.current = otaState;
+
     if (prevOtaStateRef.current === "IDLE" && otaState === "IDLE") {
       return; // Non emettere al caricamento iniziale dell'app quando lo stato è IDLE
     }
@@ -307,6 +313,7 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
   const beginUpload = useCallback(async () => {
     if (!firmwareBinRef.current) {
       setErrorMsg("Nessun file firmware selezionato");
+      otaStateRef.current = "ERROR";
       setOtaState("ERROR");
       return;
     }
@@ -314,15 +321,18 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
     const device = bleService.getDevice();
     if (!device) {
       setErrorMsg("Casco non connesso. Connettiti prima di aggiornare.");
+      otaStateRef.current = "ERROR";
       setOtaState("ERROR");
       return;
     }
 
     try {
+      otaStateRef.current = "UPLOADING";
       setOtaState("UPLOADING");
       setProgress(0);
       setBytesSent(0);
       setErrorMsg(null);
+      lastEspOpcodeRef.current = null;
       setLastEspOpcode(null);
 
       await bleOtaService.startOtaUpdate(device, firmwareBinRef.current, {
@@ -332,14 +342,17 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
           setProgress(Math.round((sent / total) * 100));
         },
         onNotify: (opcode, payload) => {
+          lastEspOpcodeRef.current = opcode;
           setLastEspOpcode(opcode);
 
           if (opcode === OTA_RESP.SUCCESS) {
+            otaStateRef.current = "SUCCESS";
             setOtaState("SUCCESS");
             setProgress(100);
           } else if (opcode === OTA_RESP.ERROR) {
             const code = payload[0] ?? 0;
             setErrorMsg(`Errore ESP32: 0x${code.toString(16).toUpperCase()}`);
+            otaStateRef.current = "ERROR";
             setOtaState("ERROR");
           } else if (opcode === OTA_RESP.PROGRESS) {
             const espBytes =
@@ -353,6 +366,7 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
       });
 
       // OTA completato con successo! Salva la nuova versione installata.
+      otaStateRef.current = "SUCCESS";
       setOtaState("SUCCESS");
       setProgress(100);
 
@@ -363,9 +377,10 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
       console.log(`[OtaContext] Versione firmware aggiornata a: ${installedVer}`);
     } catch (e: any) {
       // Dopo OTA SUCCESS l'ESP32 si riavvia e disconnette il BLE.
-      // Se l'errore arriva DOPO che abbiamo già ricevuto SUCCESS, lo ignoriamo.
-      if (otaState === "SUCCESS" || lastEspOpcode === OTA_RESP.SUCCESS) {
+      // Se l'errore arriva DOPO che abbiamo già ricevuto SUCCESS (tramite notify o opcode), lo ignoriamo.
+      if (otaStateRef.current === "SUCCESS" || lastEspOpcodeRef.current === OTA_RESP.SUCCESS) {
         console.log("[OtaContext] Disconnessione post-OTA attesa (ESP32 si è riavviato)");
+        otaStateRef.current = "SUCCESS";
         setOtaState("SUCCESS");
         setProgress(100);
         const installedVer = latestVersionInfo?.version ?? "2.1.0";
@@ -376,14 +391,16 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (e?.message?.includes("annullato")) {
+        otaStateRef.current = "ABORTED";
         setOtaState("ABORTED");
       } else {
         console.error("[OtaContext] Errore OTA:", e);
         setErrorMsg(e?.message ?? "Errore durante l'aggiornamento");
+        otaStateRef.current = "ERROR";
         setOtaState("ERROR");
       }
     }
-  }, [otaState]);
+  }, [latestVersionInfo]);
 
   // ── Download automatico e avvio OTA diretto ─────────────
   const downloadAndStartOta = useCallback(async () => {
