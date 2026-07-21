@@ -414,6 +414,7 @@ const setupVosk = async () => {
             }
 
             onResult((res) => {
+                if (isOtaActive) return;
                 try {
                     const rawText = (typeof res === 'string' ? res : String(res)).toLowerCase();
                     if (!rawText) return;
@@ -486,6 +487,7 @@ const setupVosk = async () => {
             });
 
             onPartialResult((res) => {
+                if (isOtaActive) return;
                 const text = typeof res === 'string' ? res : JSON.stringify(res);
                 if (text) checkWakeWord(text);
             });
@@ -629,7 +631,12 @@ const navigationTask = async (taskDataArguments: any) => {
             await sleep(400);
 
             CallModule.startBluetoothSco();
-            await startVosk();
+            try {
+                await startVosk();
+            } catch (err: any) {
+                console.warn('[Background] startVosk fallito, ripristino con setupVosk():', err?.message || err);
+                await setupVosk();
+            }
             isVoskRunning = true;
             console.log('[Background] ✅ Vosk riavviato con successo!');
         } catch (e: any) {
