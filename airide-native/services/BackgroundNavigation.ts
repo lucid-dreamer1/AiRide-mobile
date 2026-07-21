@@ -597,14 +597,39 @@ const navigationTask = async (taskDataArguments: any) => {
             } catch(e) {
                 console.error("Errore Demo Risk Song", e);
             }
+    // Listener per lo stato OTA: disattiva Vosk ed evita invii BLE durante il flashing per prevenire crash nativi C++
+    let isOtaActive = false;
+    DeviceEventEmitter.addListener('OtaStateChanged', async (inProgress: boolean) => {
+        console.log(`[Background] 🔄 OtaStateChanged ricevuto: ${inProgress}`);
+        isOtaActive = inProgress;
+        if (inProgress) {
+            try {
+                console.log('[Background] 🛑 Sospendo Vosk per OTA in corso...');
+                stopVosk();
+            } catch (e) {
+                console.warn('[Background] Errore stopVosk durante OTA:', e);
+            }
         } else {
-            console.log("[Background] Nessuna Risk Song impostata per la demo.");
+            // Quando l'OTA termina o fallisce, attendiamo 3 secondi per consentire all'ESP32 di riavviarsi
+            setTimeout(async () => {
+                try {
+                    console.log('[Background] ▶️ Riavvio Vosk post-OTA...');
+                    await startVosk();
+                } catch (e) {
+                    console.warn('[Background] Errore startVosk post-OTA:', e);
+                }
+            }, 3000);
         }
     });
 
     await new Promise<void>(async (resolve) => {
         while (BackgroundService.isRunning()) {
             try {
+                if (isOtaActive) {
+                    // Sospende il ciclo di navigazione durante l'OTA per non interferire con il flusso BLE
+                    await sleep(1000);
+                    continue;
+                }
                 // 1. CHIEDI IL GPS (Solo se NON in DEMO)
                 const currentStore = NavigationStore.get();
                 

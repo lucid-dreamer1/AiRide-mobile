@@ -127,14 +127,28 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
   const [currentHelmetVersion, setCurrentHelmetVersion] = useState<string>("1.0.0");
   const STORAGE_KEY_FW_VERSION = "@airide_installed_fw_version";
 
-  // Carica versione installata al mount
+  // Sincronizza lo stato OTA con il background navigation service
   useEffect(() => {
+    import("react-native").then(({ DeviceEventEmitter }) => {
+      const inProgress =
+        otaState === "PREPARING" ||
+        otaState === "DOWNLOADING_FW" ||
+        otaState === "UPLOADING" ||
+        otaState === "VERIFYING";
+      DeviceEventEmitter.emit("OtaStateChanged", inProgress);
+    });
+  }, [otaState]);
+
+  // Carica versione installata al mount e poi controlla gli aggiornamenti
+  useEffect(() => {
+    let isMounted = true;
     AsyncStorage.getItem(STORAGE_KEY_FW_VERSION).then((v) => {
-      if (v) {
+      if (isMounted && v) {
         setCurrentHelmetVersion(v);
         console.log("[OtaContext] Versione firmware installata (salvata):", v);
       }
     });
+    return () => { isMounted = false; };
   }, []);
 
   // ── Verifica aggiornamenti dal server ──────────────────────
@@ -143,6 +157,12 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
       setCheckingForUpdates(true);
       setErrorMsg(null);
       console.log("[OtaContext] Controllo aggiornamenti firmware remoto...");
+
+      // Leggi prima la versione dal disk se disponibile
+      const savedVersion = (await AsyncStorage.getItem(STORAGE_KEY_FW_VERSION)) || currentHelmetVersion;
+      if (savedVersion !== currentHelmetVersion) {
+        setCurrentHelmetVersion(savedVersion);
+      }
 
       const response = await fetch(FIRMWARE_JSON_URL, {
         headers: { 'Cache-Control': 'no-cache' }
@@ -161,10 +181,10 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
           releaseNotes: data.releaseNotes ?? "Nessuna nota di rilascio.",
         });
 
-        // Eseguiamo un check semantico elementare della versione
-        if (data.version !== currentHelmetVersion) {
+        // Eseguiamo un check semantico della versione
+        if (data.version !== savedVersion) {
           setUpdateAvailable(true);
-          console.log(`[OtaContext] Nuovo aggiornamento trovato! (${currentHelmetVersion} -> ${data.version})`);
+          console.log(`[OtaContext] Nuovo aggiornamento trovato! (${savedVersion} -> ${data.version})`);
         } else {
           setUpdateAvailable(false);
           console.log("[OtaContext] Il casco ha già l'ultima versione installata.");
@@ -172,13 +192,14 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (e: any) {
       console.warn("[OtaContext] Errore controllo aggiornamenti:", e.message);
-      // Fallback simulato se GitHub non ha ancora il file
+      const savedVersion = (await AsyncStorage.getItem(STORAGE_KEY_FW_VERSION).catch(() => null)) || currentHelmetVersion;
+      const fallbackVer = "2.1.0";
       setLatestVersionInfo({
-        version: "2.0.0",
+        version: fallbackVer,
         url: "https://raw.githubusercontent.com/lucid-dreamer1/AiRide-mobile/master/firmware.bin",
         releaseNotes: "Supporto BLE OTA integrato, migliorata stabilità grafica sul display OLED del casco.",
       });
-      setUpdateAvailable(true);
+      setUpdateAvailable(fallbackVer !== savedVersion);
     } finally {
       setCheckingForUpdates(false);
     }
@@ -329,12 +350,11 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
       setOtaState("SUCCESS");
       setProgress(100);
 
-      if (latestVersionInfo?.version) {
-        await AsyncStorage.setItem(STORAGE_KEY_FW_VERSION, latestVersionInfo.version);
-        setCurrentHelmetVersion(latestVersionInfo.version);
-        setUpdateAvailable(false);
-        console.log(`[OtaContext] Versione firmware aggiornata a: ${latestVersionInfo.version}`);
-      }
+      const installedVer = latestVersionInfo?.version ?? "2.1.0";
+      await AsyncStorage.setItem(STORAGE_KEY_FW_VERSION, installedVer).catch(() => {});
+      setCurrentHelmetVersion(installedVer);
+      setUpdateAvailable(false);
+      console.log(`[OtaContext] Versione firmware aggiornata a: ${installedVer}`);
     } catch (e: any) {
       // Dopo OTA SUCCESS l'ESP32 si riavvia e disconnette il BLE.
       // Se l'errore arriva DOPO che abbiamo già ricevuto SUCCESS, lo ignoriamo.
@@ -342,11 +362,10 @@ export function OtaProvider({ children }: { children: React.ReactNode }) {
         console.log("[OtaContext] Disconnessione post-OTA attesa (ESP32 si è riavviato)");
         setOtaState("SUCCESS");
         setProgress(100);
-        if (latestVersionInfo?.version) {
-          await AsyncStorage.setItem(STORAGE_KEY_FW_VERSION, latestVersionInfo.version).catch(() => {});
-          setCurrentHelmetVersion(latestVersionInfo.version);
-          setUpdateAvailable(false);
-        }
+        const installedVer = latestVersionInfo?.version ?? "2.1.0";
+        await AsyncStorage.setItem(STORAGE_KEY_FW_VERSION, installedVer).catch(() => {});
+        setCurrentHelmetVersion(installedVer);
+        setUpdateAvailable(false);
         return;
       }
 
