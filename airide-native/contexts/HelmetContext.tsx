@@ -318,12 +318,7 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
     [device, connected, isOtaInProgress]
   );
 
-  // Sincronizza stato OTA col background service
-  useEffect(() => {
-    import('react-native').then(({ DeviceEventEmitter }) => {
-      DeviceEventEmitter.emit('OtaStateChanged', isOtaInProgress);
-    });
-  }, [isOtaInProgress]);
+
 
   // ------------------------------------------------------------
   // DISCONNECT (mock incluso)

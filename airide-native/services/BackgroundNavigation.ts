@@ -602,27 +602,59 @@ const navigationTask = async (taskDataArguments: any) => {
         }
     });
 
+    // Helper thread-safe per gestione Vosk durante l'OTA
+    let isVoskRunning = true;
+    let otaResumeTimer: any = null;
+
+    const safeStopVosk = async () => {
+        if (!isVoskRunning) return;
+        try {
+            console.log('[Background] 🛑 Sospensione sicura Vosk...');
+            stopVosk();
+        } catch (e) {
+            console.warn('[Background] Warning stopVosk:', e);
+        } finally {
+            isVoskRunning = false;
+        }
+    };
+
+    const safeStartVosk = async () => {
+        if (isVoskRunning) {
+            console.log('[Background] Vosk già attivo, skip restart');
+            return;
+        }
+        try {
+            console.log('[Background] ▶️ Riavvio sicuro Vosk post-OTA...');
+            try { stopVosk(); } catch(e) {}
+            await sleep(400);
+
+            CallModule.startBluetoothSco();
+            await startVosk();
+            isVoskRunning = true;
+            console.log('[Background] ✅ Vosk riavviato con successo!');
+        } catch (e: any) {
+            console.warn('[Background] Warning startVosk:', e?.message || e);
+        }
+    };
+
     // Listener per lo stato OTA: disattiva Vosk ed evita invii BLE durante il flashing per prevenire crash nativi C++
     let isOtaActive = false;
     DeviceEventEmitter.addListener('OtaStateChanged', async (inProgress: boolean) => {
-        console.log(`[Background] 🔄 OtaStateChanged ricevuto: ${inProgress}`);
+        if (isOtaActive === inProgress) return; // Deduplica notifiche duplicate
         isOtaActive = inProgress;
+        console.log(`[Background] 🔄 OtaStateChanged: ${inProgress}`);
+
+        if (otaResumeTimer) {
+            clearTimeout(otaResumeTimer);
+            otaResumeTimer = null;
+        }
+
         if (inProgress) {
-            try {
-                console.log('[Background] 🛑 Sospendo Vosk per OTA in corso...');
-                stopVosk();
-            } catch (e) {
-                console.warn('[Background] Errore stopVosk durante OTA:', e);
-            }
+            await safeStopVosk();
         } else {
-            // Quando l'OTA termina o fallisce, attendiamo 3 secondi per consentire all'ESP32 di riavviarsi
-            setTimeout(async () => {
-                try {
-                    console.log('[Background] ▶️ Riavvio Vosk post-OTA...');
-                    await startVosk();
-                } catch (e) {
-                    console.warn('[Background] Errore startVosk post-OTA:', e);
-                }
+            // Quando l'OTA termina o fallisce, attendiamo 3 secondi prima di riavviare Vosk
+            otaResumeTimer = setTimeout(async () => {
+                await safeStartVosk();
             }, 3000);
         }
     });
