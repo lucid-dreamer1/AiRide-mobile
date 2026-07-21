@@ -597,6 +597,11 @@ const navigationTask = async (taskDataArguments: any) => {
             } catch(e) {
                 console.error("Errore Demo Risk Song", e);
             }
+        } else {
+            console.log("[Background] Nessuna Risk Song impostata per la demo.");
+        }
+    });
+
     // Listener per lo stato OTA: disattiva Vosk ed evita invii BLE durante il flashing per prevenire crash nativi C++
     let isOtaActive = false;
     DeviceEventEmitter.addListener('OtaStateChanged', async (inProgress: boolean) => {
