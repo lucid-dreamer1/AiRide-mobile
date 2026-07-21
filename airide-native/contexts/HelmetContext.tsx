@@ -17,7 +17,7 @@ import { bleService } from "../services/BleSingleton";
 // const manager = new BleManager(); // Rimosso: usa Singleton
 
 // 🟦 ATTIVA/DISATTIVA MOCK
-const MOCK_BLE = true;
+const MOCK_BLE = false;
 
 type HelmetContextType = {
   device: Device | null;
@@ -134,7 +134,7 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
           writeCharacteristicWithResponseForService: async (serviceUUID: string, characteristicUUID: string, base64Value: string) => {
             try {
               const decoded = base64.decode(base64Value);
-              const bytes = Array.from(decoded).map(c => c.charCodeAt(0));
+              const bytes = Array.from(decoded as string).map(c => c.charCodeAt(0));
               const opcode = bytes[0];
               console.log(`🟦 MOCK: Ricevuto comando Control OTA, Opcode: 0x${opcode.toString(16).toUpperCase()}`);
 

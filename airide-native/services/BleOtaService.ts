@@ -187,8 +187,13 @@ class BleOtaService {
       console.log("[BleOtaService] ✅ OTA completato con successo!");
 
     } finally {
-      // Pulisci sempre la subscription
-      this._unsubscribeFromControl();
+      // Pulisci subscription — il device potrebbe essersi già disconnesso
+      // (l'ESP32 si riavvia dopo il successo), quindi ignoriamo errori
+      try {
+        this._unsubscribeFromControl();
+      } catch (cleanupErr) {
+        console.log("[BleOtaService] Cleanup post-OTA (ignorabile):", cleanupErr);
+      }
     }
   }
 
@@ -253,7 +258,12 @@ class BleOtaService {
   // ── Annulla subscription notify ───────────────────────────
   private _unsubscribeFromControl() {
     if (this.notifySubscription) {
-      this.notifySubscription.remove();
+      try {
+        this.notifySubscription.remove();
+      } catch (e) {
+        // Il device potrebbe essersi già disconnesso (riavvio ESP32 post-OTA)
+        console.log("[BleOtaService] Subscription cleanup (dispositivo disconnesso):", e);
+      }
       this.notifySubscription = null;
     }
   }
