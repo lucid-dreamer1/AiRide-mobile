@@ -144,6 +144,7 @@ const CONFIRM_MSGS: Record<string, {
 const WAKE_WORD_REGEX = /\b(hey|ehy|ehi|hei|ei|eh|hai|ok|ciao|e|è|i|il|el|al|un|a)(\s+(il|i|lo|l|un))?\s+casco\b/i;
 const WAKE_WORD_WINDOW = 5000;
 let isVoskInitialized = false;
+let isOtaActive = false;
 let currentLoadedLang = 'it'; // lingua del modello Vosk attualmente caricato
 let isCommandWindowOpen = false;
 let lastWakeWordTime = 0;
@@ -645,7 +646,6 @@ const navigationTask = async (taskDataArguments: any) => {
     };
 
     // Listener per lo stato OTA: disattiva Vosk ed evita invii BLE durante il flashing per prevenire crash nativi C++
-    let isOtaActive = false;
     DeviceEventEmitter.addListener('OtaStateChanged', async (inProgress: boolean) => {
         if (isOtaActive === inProgress) return; // Deduplica notifiche duplicate
         isOtaActive = inProgress;
