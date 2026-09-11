@@ -446,9 +446,116 @@ def emergency_call():
         return jsonify({"error": str(e)}), 500
 
 
+
+###############################################################
+# SEARCH NEARBY POI (Benzinaio, Ristorante, Officina Moto)
+###############################################################
+
+@app.route("/search_nearby_poi", methods=["GET", "POST"])
+def search_nearby_poi():
+    try:
+        if request.method == "POST":
+            data = request.get_json(force=True) or {}
+            lat = data.get("lat")
+            lon = data.get("lon")
+            category = data.get("category", "gas_station")
+            radius = int(data.get("radius", 15000))
+        else:
+            lat = request.args.get("lat")
+            lon = request.args.get("lon")
+            category = request.args.get("category", "gas_station")
+            radius = int(request.args.get("radius", 15000))
+
+        if not lat or not lon:
+            return jsonify({"error": "Coordinate lat e lon mancanti"}), 400
+
+        # Mapping categorie a TomTom Search
+        if category in ["gas_station", "petrol", "benzinaio"]:
+            url = "https://api.tomtom.com/search/2/nearbySearch/.json"
+            params = {
+                "key": API_KEY,
+                "lat": lat,
+                "lon": lon,
+                "radius": radius,
+                "categorySet": "7311",
+                "limit": 3
+            }
+        elif category in ["restaurant", "food", "ristorante", "bar"]:
+            url = "https://api.tomtom.com/search/2/nearbySearch/.json"
+            params = {
+                "key": API_KEY,
+                "lat": lat,
+                "lon": lon,
+                "radius": radius,
+                "categorySet": "7315",
+                "limit": 3
+            }
+        elif category in ["mechanic", "officina", "gommista"]:
+            url = "https://api.tomtom.com/search/2/poiSearch/officina%20moto.json"
+            params = {
+                "key": API_KEY,
+                "lat": lat,
+                "lon": lon,
+                "radius": radius,
+                "limit": 3
+            }
+        else:
+            url = f"https://api.tomtom.com/search/2/poiSearch/{requests.utils.quote(str(category))}.json"
+            params = {
+                "key": API_KEY,
+                "lat": lat,
+                "lon": lon,
+                "radius": radius,
+                "limit": 3
+            }
+
+        r = requests.get(url, params=params, timeout=10)
+        if r.status_code != 200:
+            return jsonify({"error": "Errore chiamata TomTom Search", "details": r.text}), 502
+
+        data = r.json()
+        results = data.get("results", [])
+        if not results:
+            return jsonify({"status": "not_found", "message": "Nessun punto di interesse trovato nelle vicinanze"}), 404
+
+        # Ordina per distanza crescente
+        results.sort(key=lambda x: x.get("dist", float("inf")))
+        best = results[0]
+
+        poi_name = best.get("poi", {}).get("name", "Punto di interesse")
+        address_info = best.get("address", {})
+        freeform_address = address_info.get("freeformAddress", "")
+        pos = best.get("position", {})
+        dist_meters = round(best.get("dist", 0))
+
+        # Testo formattato per pronuncia vocale TTS
+        if dist_meters >= 1000:
+            dist_str = f"{round(dist_meters / 1000, 1)} chilometri"
+        else:
+            dist_str = f"{round(dist_meters / 50) * 50} metri"
+
+        return jsonify({
+            "status": "ok",
+            "name": poi_name,
+            "address": freeform_address,
+            "distance_meters": dist_meters,
+            "distance_str": dist_str,
+            "lat": pos.get("lat"),
+            "lon": pos.get("lon"),
+            "destination": f"{pos.get('lat')},{pos.get('lon')}",
+            "prompt_text": f"Trovato {poi_name} a {dist_str}. Confermi la navigazione?"
+        })
+
+    except Exception as e:
+        print("Errore /search_nearby_poi:", e)
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 ###############################################################
 # AVVIO SERVER
 ###############################################################
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+

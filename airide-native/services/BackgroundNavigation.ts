@@ -2,7 +2,7 @@ import BackgroundService from 'react-native-background-actions';
 import Geolocation from 'react-native-geolocation-service';
 import { bleService } from './BleSingleton';
 import { DeviceEventEmitter, Platform, PermissionsAndroid } from 'react-native';
-import { updatePosition } from './api'; 
+import { updatePosition, searchNearbyPoi, NearbyPoiItem } from './api'; 
 import { NavigationStore } from './NavigationStore'; 
 import { 
   loadModel, 
@@ -62,13 +62,18 @@ const CONFIRM_MSGS: Record<string, {
     changeRoute: string; recalculate: string; avoidHighways: string;
     noNav: string; remaining: string;
     timePrefix: string; timeSuffix: string;
+    speed: string; noSpeed: string;
+    voiceMuted: string; voiceUnmuted: string;
+    helmetConnected: string; helmetDisconnected: string;
+    searchingPoi: string; poiNotFound: string; poiConfirm: string;
+    poiNextConfirm: string; poiNoMore: string;
 }> = {
     it: {
         yes: 'Ottimo, avvio la navigazione.',
         timeout: 'Tempo scaduto, annullo.',
         dimmi: 'Dimmi',
         cancelled: 'Ok, annullato.',
-        notUnderstood: 'Non ho capito. Confermi?',
+        notUnderstood: 'Non ho capito. Vuoi andare qui?',
         confirm: 'Rotta verso {dest}. Confermi?',
         changeRoute: 'Vuoi cambiare la rotta verso {dest}?',
         recalculate: 'Vuoi ricalcolare il percorso?',
@@ -77,6 +82,17 @@ const CONFIRM_MSGS: Record<string, {
         remaining: 'Mancano ancora {km} chilometri.',
         timePrefix: 'Sono le',
         timeSuffix: 'e',
+        speed: 'Stai viaggiando a {speed} chilometri orari.',
+        noSpeed: 'Velocità non rilevabile al momento.',
+        voiceMuted: 'Voce guida disattivata.',
+        voiceUnmuted: 'Voce guida riattivata.',
+        helmetConnected: 'Il casco è connesso e operativo.',
+        helmetDisconnected: 'Il casco non risulta connesso.',
+        searchingPoi: 'Cerco {poi} nelle vicinanze...',
+        poiNotFound: 'Nessun punto trovato nelle vicinanze.',
+        poiConfirm: 'Trovato {name} a {dist}. Vuoi andare qui?',
+        poiNextConfirm: 'C\'è anche {name} a {dist}. Ti va bene?',
+        poiNoMore: 'Non ci sono altri posti vicini. Vuoi tornare al primo o annullare?',
     },
     en: {
         yes: 'Great, starting navigation.',
@@ -92,6 +108,17 @@ const CONFIRM_MSGS: Record<string, {
         remaining: '{km} kilometres remaining.',
         timePrefix: "It's",
         timeSuffix: '',
+        speed: 'You are travelling at {speed} kilometres per hour.',
+        noSpeed: 'Speed not available.',
+        voiceMuted: 'Voice guidance muted.',
+        voiceUnmuted: 'Voice guidance unmuted.',
+        helmetConnected: 'Helmet connected and operational.',
+        helmetDisconnected: 'Helmet is not connected.',
+        searchingPoi: 'Searching for {poi} nearby...',
+        poiNotFound: 'No locations found nearby.',
+        poiConfirm: 'Found {name} at {dist}. Do you want to go here?',
+        poiNextConfirm: 'There is also {name} at {dist}. Does this work for you?',
+        poiNoMore: 'No other places nearby. Do you want the first one or cancel?',
     },
     fr: {
         yes: 'Parfait, je lance la navigation.',
@@ -107,6 +134,17 @@ const CONFIRM_MSGS: Record<string, {
         remaining: 'Il reste {km} kilomètres.',
         timePrefix: 'Il est',
         timeSuffix: '',
+        speed: 'Vous roulez à {speed} kilomètres par heure.',
+        noSpeed: 'Vitesse non disponible.',
+        voiceMuted: 'Guidage vocal désactivé.',
+        voiceUnmuted: 'Guidage vocal réactivé.',
+        helmetConnected: 'Casque connecté et opérationnel.',
+        helmetDisconnected: 'Casque non connecté.',
+        searchingPoi: 'Recherche de {poi} à proximité...',
+        poiNotFound: 'Aucun lieu trouvé à proximité.',
+        poiConfirm: '{name} trouvé à {dist}. Tu veux aller là ?',
+        poiNextConfirm: 'Il y a aussi {name} à {dist}. Ça te va ?',
+        poiNoMore: 'Aucun autre lieu à proximité. Voulez-vous le premier ou annuler ?',
     },
     de: {
         yes: 'Super, starte die Navigation.',
@@ -122,6 +160,17 @@ const CONFIRM_MSGS: Record<string, {
         remaining: 'Noch {km} Kilometer.',
         timePrefix: 'Es ist',
         timeSuffix: 'Uhr',
+        speed: 'Du fährst {speed} Kilometer pro Stunde.',
+        noSpeed: 'Geschwindigkeit nicht verfügbar.',
+        voiceMuted: 'Sprachführung deaktiviert.',
+        voiceUnmuted: 'Sprachführung aktiviert.',
+        helmetConnected: 'Helm verbunden und betriebsbereit.',
+        helmetDisconnected: 'Helm nicht verbunden.',
+        searchingPoi: 'Suche nach {poi} in der Nähe...',
+        poiNotFound: 'Keine Orte in der Nähe gefunden.',
+        poiConfirm: '{name} in {dist} gefunden. Möchtest du dorthin fahren?',
+        poiNextConfirm: 'Es gibt auch {name} in {dist}. Passt das?',
+        poiNoMore: 'Keine weiteren Orte in der Nähe. Zum ersten zurück oder abbrechen?',
     },
     es: {
         yes: 'Genial, iniciando navegación.',
@@ -137,12 +186,24 @@ const CONFIRM_MSGS: Record<string, {
         remaining: 'Quedan {km} kilómetros.',
         timePrefix: 'Son las',
         timeSuffix: '',
+        speed: 'Vas a {speed} kilómetros por hora.',
+        noSpeed: 'Velocidad no disponible.',
+        voiceMuted: 'Guía de voz desactivada.',
+        voiceUnmuted: 'Guía de voz reactivada.',
+        helmetConnected: 'Casco conectado y operativo.',
+        helmetDisconnected: 'El casco no está conectado.',
+        searchingPoi: 'Buscando {poi} cerca...',
+        poiNotFound: 'No se encontraron lugares cercanos.',
+        poiConfirm: 'Encontrado {name} a {dist}. ¿Quieres ir aquí?',
+        poiNextConfirm: 'También está {name} a {dist}. ¿Te parece bien?',
+        poiNoMore: 'No hay más lugares cercanos. ¿Quieres el primero o cancelar?',
     },
 };
 
 // --- VOSK CONFIG ---
-const WAKE_WORD_REGEX = /\b(hey|ehy|ehi|hei|ei|eh|hai|ok|ciao|e|è|i|il|el|al|un|a)(\s+(il|i|lo|l|un))?\s+casco\b/i;
-const WAKE_WORD_WINDOW = 5000;
+// Usa la wake word rigorosa di IntentParser (niente più falsi allarmi su vocali o rumore moto)
+const WAKE_WORD_REGEX = IntentParser.WAKE_WORD_REGEX;
+const WAKE_WORD_WINDOW = 6000;
 let isVoskInitialized = false;
 let isOtaActive = false;
 let currentLoadedLang = 'it'; // lingua del modello Vosk attualmente caricato
@@ -151,10 +212,11 @@ let lastWakeWordTime = 0;
 const intentParser = new IntentParser();
 
 // --- CONVERSATION STATE ---
-type VoiceSessionState = 'IDLE' | 'CONFIRM_NAV' | 'CONFIRM_CHANGE';
+type VoiceSessionState = 'IDLE' | 'CONFIRM_NAV' | 'CONFIRM_CHANGE' | 'CONFIRM_POI';
 let sessionState: VoiceSessionState = 'IDLE';
 let pendingIntent: VoiceIntent | null = null;
 let sessionTimeout: any = null;
+
 
 // --- AI RESCUE EMERGENCY STATE ---
 let isEmergencyMode = false;
@@ -163,7 +225,11 @@ let isEmergencyMode = false;
 // Impedisce a Vosk di processare l'audio prodotto dal TTS stesso
 let isTTSSpeaking = false;
 
-const RESET_SESSION_TIMEOUT = 10000; // 10s per rispondere
+const RESET_SESSION_TIMEOUT = 20000; // 20s effettivi di ascolto dopo che il TTS termina di parlare
+let unclearInputCount = 0; // Contatore input non riconosciuti nella sessione corrente
+
+let activePoiList: NearbyPoiItem[] = [];
+let currentPoiIndex = 0;
 
 const options = {
     taskName: 'AirRideNav',
@@ -197,31 +263,55 @@ const gpsOptions = {
 const TTS_COOLDOWN_MS = 900; // ms di silenzio dopo il TTS prima di riascoltare
 let ttsSafetyTimer: any = null;
 
+let lastTTSEndTime = 0;
+
 const clearTTSFlag = (delay = TTS_COOLDOWN_MS) => {
     if (ttsSafetyTimer) clearTimeout(ttsSafetyTimer);
     ttsSafetyTimer = setTimeout(() => {
         isTTSSpeaking = false;
+        lastTTSEndTime = Date.now();
         console.log('[Background] ✅ TTS terminato — Vosk riprende ad ascoltare');
     }, delay);
 };
 
-const speak = (text: string, langOverride?: string) => {
+const speak = (text: string, langOverride?: string, onFinished?: () => void) => {
     const langCode = LANG_CODE_MAP[langOverride || voiceSettings.language] || 'it-IT';
     console.log(`[Background] 🗣️ TTS (${langCode}): "${text}"`);
     isTTSSpeaking = true;
 
-    // Safety fallback: se onDone non scatta mai (bug Android), sblocca dopo 10s
+    let hasFinished = false;
+    const triggerFinished = () => {
+        if (!hasFinished) {
+            hasFinished = true;
+            if (onFinished) onFinished();
+        }
+    };
+
+    // Safety fallback: se onDone non scatta mai (bug Android), sblocca.
+    // Timeout proporzionale alla lunghezza del testo (~100ms per carattere + 3s margine)
+    const safetyMs = Math.max(6000, Math.min(15000, text.length * 100 + 3000));
     if (ttsSafetyTimer) clearTimeout(ttsSafetyTimer);
     ttsSafetyTimer = setTimeout(() => {
         isTTSSpeaking = false;
-        console.log('[Background] ⚠️ TTS safety timeout — Vosk riabilitato');
-    }, 10000);
+        lastTTSEndTime = Date.now();
+        console.log(`[Background] ⚠️ TTS safety timeout (${safetyMs}ms) — Vosk riabilitato`);
+        triggerFinished();
+    }, safetyMs);
 
     Speech.speak(text, {
         language: langCode,
-        onDone:    () => clearTTSFlag(TTS_COOLDOWN_MS),
-        onStopped: () => clearTTSFlag(TTS_COOLDOWN_MS),
-        onError:   () => clearTTSFlag(0), // su errore sblocca subito
+        onDone: () => {
+            clearTTSFlag(TTS_COOLDOWN_MS);
+            setTimeout(triggerFinished, TTS_COOLDOWN_MS);
+        },
+        onStopped: () => {
+            clearTTSFlag(TTS_COOLDOWN_MS);
+            // Non invocare triggerFinished se interrotto
+        },
+        onError: () => {
+            clearTTSFlag(0);
+            triggerFinished();
+        },
     });
 
     // Salva le parole chiave del testo appena detto per il filtro eco
@@ -256,6 +346,9 @@ const removeEchoPrefix = (text: string): string => {
 const resetSession = () => {
     sessionState = 'IDLE';
     pendingIntent = null;
+    activePoiList = [];
+    currentPoiIndex = 0;
+    unclearInputCount = 0;
     if (sessionTimeout) clearTimeout(sessionTimeout);
     sessionTimeout = null;
     DeviceEventEmitter.emit('Voice_Status', { status: 'idle' });
@@ -263,8 +356,9 @@ const resetSession = () => {
 
 const startSessionTimeout = () => {
     if (sessionTimeout) clearTimeout(sessionTimeout);
+    console.log(`[Background] ⏱️ Timer sessione avviato: ${RESET_SESSION_TIMEOUT / 1000}s da ora (${new Date().toISOString()})`);
     sessionTimeout = setTimeout(() => {
-        console.log('[Background] ⌛ Sessione scaduta');
+        console.log(`[Background] ⌛ Sessione scaduta (${new Date().toISOString()})`);
         if (sessionState !== 'IDLE') {
             const msg = CONFIRM_MSGS[voiceSettings.language]?.timeout || 'Tempo scaduto, annullo.';
             speak(msg);
@@ -273,11 +367,68 @@ const startSessionTimeout = () => {
     }, RESET_SESSION_TIMEOUT);
 };
 
-// --- VOSK HANDLERS ---
+const handlePoiSearch = async (category: string, poiNameLocal: string) => {
+    const msgs = CONFIRM_MSGS[voiceSettings.language] || CONFIRM_MSGS.it;
+    // Nota: la ricerca su TomTom richiede meno di 150ms.
+    // Non diciamo "Cerco..." per evitare la sovrapposizione e cancellazione del TTS in Android!
+
+    try {
+        let lat: number | null = NavigationStore.get().currentCoords?.latitude ?? null;
+        let lon: number | null = NavigationStore.get().currentCoords?.longitude ?? null;
+
+        if (!lat || !lon) {
+            // Recupera coordinate da Geolocation come fallback rapido
+            const pos = await new Promise<any>((resolve) => {
+                Geolocation.getCurrentPosition(
+                    (p) => resolve(p.coords),
+                    () => resolve(null),
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 10000 }
+                );
+            });
+
+            if (pos) {
+                lat = pos.latitude;
+                lon = pos.longitude;
+            }
+        }
+
+        if (!lat || !lon) {
+            speak(msgs.poiNotFound);
+            return;
+        }
+
+        const result = await searchNearbyPoi(lat, lon, category);
+        if (result && result.status === 'ok' && result.items && result.items.length > 0) {
+            activePoiList = result.items;
+            currentPoiIndex = 0;
+            const firstPoi = activePoiList[0];
+
+            pendingIntent = { 
+                type: 'NAVIGATE_TO', 
+                destination: firstPoi.destination,
+                destinationName: firstPoi.name 
+            };
+            sessionState = 'CONFIRM_POI';
+            const prompt = msgs.poiConfirm.replace('{name}', firstPoi.name).replace('{dist}', firstPoi.distance_str);
+            // Avvia la finestra di ascolto SOLO DOPO che la voce ha finito di parlare!
+            unclearInputCount = 0;
+            speak(prompt, undefined, () => {
+                console.log(`[Background] 🎧 Proposta POI #${currentPoiIndex + 1} annunciata. Finestra di ascolto aperta (${RESET_SESSION_TIMEOUT / 1000}s)`);
+                startSessionTimeout();
+            });
+        } else {
+            speak(msgs.poiNotFound);
+        }
+    } catch (err) {
+        console.error('[Background] Errore searchNearbyPoi:', err);
+        speak(msgs.poiNotFound);
+    }
+};
+
 const checkWakeWord = (text: string) => {
     if (sessionState !== 'IDLE') return true;
 
-    if (WAKE_WORD_REGEX.test(text)) {
+    if (intentParser.hasWakeWord(text)) {
         console.log('[Background] ⚡ Wake word rilevata!');
         lastWakeWordTime = Date.now();
         if (!isCommandWindowOpen) {
@@ -303,11 +454,62 @@ const checkWakeWord = (text: string) => {
 const handleIntent = (intent: VoiceIntent) => {
     console.log('[Background] 🤖 Handling Intent:', intent.type, 'State:', sessionState);
 
-    // 1. GESTIONE STATI DI CONFERMA
     const msgs = CONFIRM_MSGS[voiceSettings.language] || CONFIRM_MSGS.it;
-    if (sessionState === 'CONFIRM_NAV' || sessionState === 'CONFIRM_CHANGE') {
+
+    // 1. GESTIONE STATI DI CONFERMA (POI, NAV, CHANGE)
+    if (sessionState === 'CONFIRM_POI') {
         if (intent.type === 'YES') {
-            speak(sessionState === 'CONFIRM_NAV' ? msgs.yes : msgs.yes);
+            speak(msgs.yes);
+            if (pendingIntent) {
+                 DeviceEventEmitter.emit('Voice_Intent', pendingIntent);
+            }
+            resetSession();
+            return;
+        } else if (intent.type === 'NEXT_POI' || intent.type === 'NO') {
+            // Se l'utente dice "no", "un altro", "prossimo" o "cambia" -> proponi il POI successivo!
+            if (activePoiList.length > 0 && currentPoiIndex + 1 < activePoiList.length) {
+                currentPoiIndex++;
+                const nextPoi = activePoiList[currentPoiIndex];
+                pendingIntent = {
+                    type: 'NAVIGATE_TO',
+                    destination: nextPoi.destination,
+                    destinationName: nextPoi.name,
+                };
+                unclearInputCount = 0; // Reset grazia quando l'utente interagisce correttamente
+                const nextPrompt = msgs.poiNextConfirm.replace('{name}', nextPoi.name).replace('{dist}', nextPoi.distance_str);
+                speak(nextPrompt, undefined, () => {
+                    console.log(`[Background] 🎧 Proposta POI #${currentPoiIndex + 1}: in ascolto (${RESET_SESSION_TIMEOUT / 1000}s)`);
+                    startSessionTimeout();
+                });
+                return;
+            } else {
+                // Abbiamo esaurito i POI trovati
+                speak(msgs.poiNoMore, undefined, () => {
+                    startSessionTimeout();
+                });
+                return;
+            }
+        } else if (intent.type === 'CANCEL_NAVIGATION') {
+            speak(msgs.cancelled);
+            resetSession();
+            return;
+        } else if (intent.type === 'NAVIGATE_TO') {
+            // Nuova richiesta navigazione esplicita (es. "portami a Roma") -> sovrascrive
+        } else {
+            // Primo input non chiaro: estendi silenziosamente il timer (grazia)
+            // Secondo+ input non chiaro: ri-prompta vocalmente
+            unclearInputCount++;
+            if (unclearInputCount <= 1) {
+                console.log('[Background] 🔄 Input non chiaro (grazia): estendo timer senza ri-promptare');
+                startSessionTimeout(); // Rinnova timer senza parlare
+            } else {
+                speak(msgs.notUnderstood, undefined, () => startSessionTimeout());
+            }
+            return;
+        }
+    } else if (sessionState === 'CONFIRM_NAV' || sessionState === 'CONFIRM_CHANGE') {
+        if (intent.type === 'YES') {
+            speak(msgs.yes);
             if (pendingIntent) {
                  DeviceEventEmitter.emit('Voice_Intent', pendingIntent);
             }
@@ -317,39 +519,118 @@ const handleIntent = (intent: VoiceIntent) => {
             speak(msgs.cancelled);
             resetSession();
             return;
+        } else if (intent.type === 'NAVIGATE_TO') {
+            // Nuova richiesta navigazione
         } else {
-            if (intent.type === 'NAVIGATE_TO') {
-                // Nuova richiesta navigazione - sovrascrive la conferma in corso
+            // Stesso meccanismo di grazia
+            unclearInputCount++;
+            if (unclearInputCount <= 1) {
+                console.log('[Background] 🔄 Input non chiaro (grazia NAV): estendo timer');
+                startSessionTimeout();
             } else {
-                speak(msgs.notUnderstood);
-                return;
+                speak(msgs.notUnderstood, undefined, () => startSessionTimeout());
             }
+            return;
         }
     }
 
     // 2. GESTIONE COMANDI STANDARD (IDLE o Sovrascrittura)
-    const m = CONFIRM_MSGS[voiceSettings.language] || CONFIRM_MSGS.it;
     switch (intent.type) {
         case 'NAVIGATE_TO': {
             pendingIntent = intent;
             sessionState = 'CONFIRM_NAV';
             const store = NavigationStore.get();
             const msg = store.isNavigating
-                ? m.changeRoute.replace('{dest}', intent.destination)
-                : m.confirm.replace('{dest}', intent.destination);
+                ? msgs.changeRoute.replace('{dest}', intent.destination)
+                : msgs.confirm.replace('{dest}', intent.destination);
             speak(msg);
             startSessionTimeout();
             break;
         }
 
+        case 'FIND_GAS_STATION':
+            handlePoiSearch('gas_station', 'un distributore');
+            break;
+
+        case 'FIND_FOOD':
+            handlePoiSearch('restaurant', 'un ristorante');
+            break;
+
+        case 'FIND_MECHANIC':
+            handlePoiSearch('mechanic', 'un meccanico');
+            break;
+
+        case 'REPEAT_INSTRUCTION': {
+            const store = NavigationStore.get();
+            if (store.isNavigating && store.text) {
+                const distStr = (store.distance && store.distance > 0) ? `Tra ${store.distance} metri, ` : '';
+                speak(`${distStr}${store.text}`);
+            } else {
+                speak(msgs.noNav);
+            }
+            break;
+        }
+
+        case 'GET_SPEED': {
+            const store = NavigationStore.get();
+            const spd = Math.round(store.currentSpeedKmh || 0);
+            if (spd > 3) {
+                speak(msgs.speed.replace('{speed}', String(spd)));
+            } else {
+                speak(msgs.noSpeed);
+            }
+            break;
+        }
+
+        case 'GET_HELMET_STATUS': {
+            const store = NavigationStore.get();
+            if (store.isHelmetConnected) {
+                speak(msgs.helmetConnected);
+            } else {
+                speak(msgs.helmetDisconnected);
+            }
+            break;
+        }
+
+        case 'GET_ETA': {
+            const store = NavigationStore.get();
+            if (store.isNavigating && store.remainingDist) {
+                const km = (store.remainingDist / 1000).toFixed(1);
+                speak(`Mancano ${km} chilometri all'arrivo.`);
+            } else {
+                speak(msgs.noNav);
+            }
+            break;
+        }
+
+        case 'TOGGLE_VOICE_MUTE': {
+            if (intent.action === 'mute') {
+                voiceSettings.enabled = false;
+                speak(msgs.voiceMuted);
+            } else if (intent.action === 'unmute') {
+                voiceSettings.enabled = true;
+                speak(msgs.voiceUnmuted);
+            } else {
+                voiceSettings.enabled = !voiceSettings.enabled;
+                speak(voiceSettings.enabled ? msgs.voiceUnmuted : msgs.voiceMuted);
+            }
+            DeviceEventEmitter.emit('VoiceSettings_Updated');
+            break;
+        }
+
+        case 'NAVIGATE_HOME':
+        case 'NAVIGATE_WORK':
+            DeviceEventEmitter.emit('Voice_Intent', intent);
+            break;
+
         case 'CHANGE_ROUTE':
             if (intent.avoid) {
-                speak(m.avoidHighways);
+                speak(msgs.avoidHighways);
                 pendingIntent = intent;
                 sessionState = 'CONFIRM_CHANGE';
                 startSessionTimeout();
             } else {
-                speak(m.recalculate);
+                speak(msgs.recalculate);
                 pendingIntent = { type: 'RECALCULATE_ROUTE' };
                 sessionState = 'CONFIRM_CHANGE';
                 startSessionTimeout();
@@ -361,9 +642,9 @@ const handleIntent = (intent: VoiceIntent) => {
             const hours = now.getHours();
             const minutes = now.getMinutes();
             const minStr = minutes.toString().padStart(2, '0');
-            const timeStr = m.timeSuffix
-                ? `${m.timePrefix} ${hours} ${m.timeSuffix} ${minStr}`
-                : `${m.timePrefix} ${hours}:${minStr}`;
+            const timeStr = msgs.timeSuffix
+                ? `${msgs.timePrefix} ${hours} ${msgs.timeSuffix} ${minStr}`
+                : `${msgs.timePrefix} ${hours}:${minStr}`;
             speak(timeStr);
             break;
         }
@@ -372,9 +653,9 @@ const handleIntent = (intent: VoiceIntent) => {
             const store = NavigationStore.get();
             if (store.totalDist && store.remainingDist) {
                 const km = (store.remainingDist / 1000).toFixed(1);
-                speak(m.remaining.replace('{km}', km));
+                speak(msgs.remaining.replace('{km}', km));
             } else {
-                speak(m.noNav);
+                speak(msgs.noNav);
             }
             break;
         }
@@ -417,21 +698,20 @@ const setupVosk = async () => {
             onResult((res) => {
                 if (isOtaActive) return;
                 try {
-                    const rawText = (typeof res === 'string' ? res : String(res)).toLowerCase();
+                    const rawText = (typeof res === 'string' ? res : String(res)).toLowerCase().trim();
                     if (!rawText) return;
 
-                    // Scarta l'input se il TTS sta ancora parlando (anti-echo)
-                    if (isTTSSpeaking) {
-                        console.log('[Background] 🔇 Vosk input ignorato (TTS in riproduzione)');
+                    // Scarta l'input se il TTS sta ancora parlando (anti-echo) o è appena finito
+                    if (isTTSSpeaking || (Date.now() - lastTTSEndTime < 300)) {
+                        console.log('[Background] 🔇 Vosk input ignorato (TTS in riproduzione o cooldown)');
                         return;
                     }
 
                     // Rimuove eco del TTS dal prefisso, tenendo solo la risposta dell'utente
-                    // Es: "rotta verso roma confermi sì" → "sì"
                     const text = removeEchoPrefix(rawText);
                     if (!text) return; // Era solo eco, nessun input utente
 
-                    const justWokeUp = checkWakeWord(text);
+                    const { hasWakeWord, command } = intentParser.stripWakeWord(text);
                     const isWithinWindow = (Date.now() - lastWakeWordTime) < WAKE_WORD_WINDOW;
 
                     // GESTIONE AI RESCUE (Priorità massima)
@@ -444,40 +724,47 @@ const setupVosk = async () => {
                         }
                     }
 
-                    // Se siamo in Sessione (attesa conferma), processiamo tutto
-                    if (sessionState !== 'IDLE' || isWithinWindow || justWokeUp) {
-                         let cleanText = text;
-                         const match = text.match(WAKE_WORD_REGEX);
-                         
-                         if (match && match.index !== undefined) {
-                            cleanText = text.substring(match.index + match[0].length).trim();
-                         } else {
-                            cleanText = text.trim();
-                         }
-
-                         // 🔍 LOG RAW: mostra ESATTAMENTE cosa ha trascritto Vosk
-                         if (cleanText.length > 0) {
-                             console.log(`[VOSK RAW] 🔍 Testo trascritto: "${cleanText}"`);
-                         }
-
-                         if (cleanText.length > 0) {
-                             const skipCheck = (sessionState !== 'IDLE') || justWokeUp || isWithinWindow;
-                             const intent = intentParser.parse(cleanText, { skipWakeWordCheck: skipCheck });
-                             
-                             console.log(`[VOSK RAW] 🤖 Intent rilevato: ${intent.type}`);
-                             
-                             if (intent.type !== 'UNKNOWN') {
-                                 handleIntent(intent);
-                                 lastWakeWordTime = 0; // Reset window dopo comando
-                                 if (sessionState === 'IDLE') {
-                                     isCommandWindowOpen = false;
-                                     DeviceEventEmitter.emit('Voice_Status', { status: 'idle' });
-                                 }
-                             }
-                         }
+                    // Caso 1: Ha pronunciato solo la wake word senza comandi (es: "Hey casco") in stato IDLE
+                    if (sessionState === 'IDLE' && hasWakeWord && command.length === 0) {
+                        console.log('[Background] ⚡ Wake word isolata rilevata!');
+                        lastWakeWordTime = Date.now();
+                        if (!isCommandWindowOpen) {
+                            isCommandWindowOpen = true;
+                            if (!voiceSettings.enabled) {
+                                const msg = DISABLED_MSG[voiceSettings.language] || DISABLED_MSG.it;
+                                speak(msg);
+                                isCommandWindowOpen = false;
+                            } else {
+                                const dimmi = CONFIRM_MSGS[voiceSettings.language]?.dimmi || 'Dimmi';
+                                speak(dimmi);
+                                DeviceEventEmitter.emit('Voice_Status', { status: 'listening' });
+                            }
+                        }
+                        return;
                     }
-                    
-                    if (sessionState === 'IDLE' && isCommandWindowOpen && !isWithinWindow && !justWokeUp) {
+
+                    // Caso 2: Sessione di conferma attiva, finestra aperta, o frase con wake word + comando
+                    if (sessionState !== 'IDLE' || isWithinWindow || hasWakeWord) {
+                        const cleanCmd = hasWakeWord ? command : text;
+
+                        if (cleanCmd.length > 0) {
+                            console.log(`[VOSK RAW] 🔍 Testo comando: "${cleanCmd}"`);
+                            const skipCheck = (sessionState !== 'IDLE') || isWithinWindow || hasWakeWord;
+                            const intent = intentParser.parse(cleanCmd, { skipWakeWordCheck: skipCheck });
+                            console.log(`[VOSK RAW] 🤖 Intent rilevato: ${intent.type}`);
+
+                            if (intent.type !== 'UNKNOWN') {
+                                handleIntent(intent);
+                                lastWakeWordTime = 0; // Reset window dopo comando
+                                if (sessionState === 'IDLE') {
+                                    isCommandWindowOpen = false;
+                                    DeviceEventEmitter.emit('Voice_Status', { status: 'idle' });
+                                }
+                            }
+                        }
+                    }
+
+                    if (sessionState === 'IDLE' && isCommandWindowOpen && !isWithinWindow && !hasWakeWord) {
                         isCommandWindowOpen = false;
                         DeviceEventEmitter.emit('Voice_Status', { status: 'idle' });
                     }
@@ -488,9 +775,24 @@ const setupVosk = async () => {
             });
 
             onPartialResult((res) => {
-                if (isOtaActive) return;
-                const text = typeof res === 'string' ? res : JSON.stringify(res);
-                if (text) checkWakeWord(text);
+                if (isOtaActive || isTTSSpeaking || (Date.now() - lastTTSEndTime < 800)) return;
+                const rawPartial = (typeof res === 'string' ? res : JSON.stringify(res)).toLowerCase().trim();
+                if (!rawPartial || rawPartial.length < 6) return;
+
+                const text = removeEchoPrefix(rawPartial);
+                if (!text || text.length < 6) return;
+
+                if (intentParser.hasWakeWord(text)) {
+                    const { command } = intentParser.stripWakeWord(text);
+                    // Se l'utente sta pronunciando un comando continuo ("hey casco portami..."), non interrompere!
+                    if (command.length > 0) {
+                        lastWakeWordTime = Date.now();
+                        return;
+                    }
+                    if (!isCommandWindowOpen && (Date.now() - lastWakeWordTime > 3000)) {
+                        checkWakeWord(text);
+                    }
+                }
             });
             
             onError((e) => {
@@ -717,7 +1019,8 @@ const navigationTask = async (taskDataArguments: any) => {
                             const res = await updatePosition(latitude, longitude);
 
                             // --- STATISTICHE DEL VIAGGIO (Velocità) ---
-                            const speedKmh = (position.coords.speed || 0) * 3.6;
+                            const speedKmh = Math.max(0, (position.coords.speed || 0) * 3.6);
+                            NavigationStore.set({ currentSpeedKmh: speedKmh });
                             
                             const currentStore = NavigationStore.get();
                             const stats = currentStore.rideStats;

@@ -366,6 +366,7 @@ export default function HomeScreen() {
         };
 
         setCurrentPosition(p);
+        NavigationStore.set({ currentCoords: p });
         mapRef.current?.animateCamera(
           { center: p, zoom: 16 },
           { duration: 500 }
@@ -468,6 +469,10 @@ export default function HomeScreen() {
             
             // 1. Aggiorna posizione locale
             setCurrentPosition(newPos);
+            NavigationStore.set({
+              currentCoords: newPos,
+              currentSpeedKmh: Math.round((speed || 0) * 3.6),
+            });
 
             const now = Date.now();
 
@@ -743,7 +748,7 @@ export default function HomeScreen() {
 
       switch (intent.type) {
         case 'NAVIGATE_TO':
-          setDestination(intent.destination);
+          setDestination(intent.destinationName || intent.destination);
           const routeData = await fetchRoute(intent.destination);
           
           if (routeData) {
@@ -807,7 +812,78 @@ export default function HomeScreen() {
             setTimeout(() => {
                 ttsService.speak("Al momento non hai nuove notifiche.", VoicePriority.HIGH);
             }, 500);
-            break;         case 'CANCEL_NAVIGATION':
+            break;
+
+        case 'NAVIGATE_HOME': {
+          console.log('[HomeScreen] Eseguo NAVIGATE_HOME');
+          const homeAddr = await AsyncStorage.getItem('@airide_home_address');
+          if (homeAddr) {
+            setDestination(homeAddr);
+            const routeData = await fetchRoute(homeAddr);
+            if (routeData) {
+              const startPos = currentPosition || { latitude: 0, longitude: 0 };
+              await startTrip({ lat: startPos.latitude, lon: startPos.longitude }, homeAddr);
+              setIsNavigating(true);
+              BackgroundNavigation.start();
+              ttsService.speak("Rotta verso casa avviata!", VoicePriority.HIGH);
+            }
+          } else {
+            ttsService.speak("Indirizzo di casa non impostato. Puoi configurarlo nel tuo profilo.", VoicePriority.HIGH);
+          }
+          break;
+        }
+
+        case 'NAVIGATE_WORK': {
+          console.log('[HomeScreen] Eseguo NAVIGATE_WORK');
+          const workAddr = await AsyncStorage.getItem('@airide_work_address');
+          if (workAddr) {
+            setDestination(workAddr);
+            const routeData = await fetchRoute(workAddr);
+            if (routeData) {
+              const startPos = currentPosition || { latitude: 0, longitude: 0 };
+              await startTrip({ lat: startPos.latitude, lon: startPos.longitude }, workAddr);
+              setIsNavigating(true);
+              BackgroundNavigation.start();
+              ttsService.speak("Rotta verso il lavoro avviata!", VoicePriority.HIGH);
+            }
+          } else {
+            ttsService.speak("Indirizzo di lavoro non impostato.", VoicePriority.HIGH);
+          }
+          break;
+        }
+
+        case 'REPEAT_INSTRUCTION':
+          console.log('[HomeScreen] Eseguo REPEAT_INSTRUCTION');
+          if (isNavigating && currentInstruction) {
+             const spoken = currentInstruction.testo || currentInstruction.text;
+             if (spoken) {
+                const distStr = currentInstruction.metri ? `Tra ${currentInstruction.metri} metri, ` : '';
+                ttsService.speak(`${distStr}${spoken}`, VoicePriority.HIGH);
+             }
+          } else {
+             ttsService.speak("Nessuna navigazione attiva.", VoicePriority.HIGH);
+          }
+          break;
+
+        case 'GET_SPEED': {
+          console.log('[HomeScreen] Eseguo GET_SPEED');
+          const spd = Math.round(NavigationStore.get().currentSpeedKmh || 0);
+          if (spd > 3) {
+             ttsService.speak(`Stai viaggiando a ${spd} chilometri orari.`, VoicePriority.HIGH);
+          } else {
+             ttsService.speak("Velocità non rilevabile al momento.", VoicePriority.HIGH);
+          }
+          break;
+        }
+
+        case 'GET_HELMET_STATUS': {
+          console.log('[HomeScreen] Eseguo GET_HELMET_STATUS');
+          const connected = NavigationStore.get().isHelmetConnected;
+          ttsService.speak(connected ? "Il casco è connesso e operativo." : "Il casco non risulta connesso.", VoicePriority.HIGH);
+          break;
+        }
+
+        case 'CANCEL_NAVIGATION':
           handleResetRoute();
           BackgroundNavigation.stop(); // Stop anche da voce
           break;

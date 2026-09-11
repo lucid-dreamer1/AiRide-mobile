@@ -13,11 +13,13 @@ import { Platform, PermissionsAndroid } from "react-native";
 import base64 from "react-native-base64";
 
 import { bleService } from "../services/BleSingleton";
+import { NavigationStore } from "../services/NavigationStore";
+
 
 // const manager = new BleManager(); // Rimosso: usa Singleton
 
 // 🟦 ATTIVA/DISATTIVA MOCK
-const MOCK_BLE = true;
+const MOCK_BLE = false;
 
 type HelmetContextType = {
   device: Device | null;
@@ -84,6 +86,10 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
   const [isOtaInProgress, setOtaInProgress] = useState(false);
 
   useEffect(() => {
+    NavigationStore.set({ isHelmetConnected: connected });
+  }, [connected]);
+
+  useEffect(() => {
     return () => {
       // Non distruggiamo il manager qui perché è gestito dal Singleton e serve al background
       // if (!MOCK_BLE) bleService.manager.destroy(); 
@@ -102,27 +108,27 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
 
       setTimeout(() => {
         let currentListener: ((error: any, characteristic: any) => void) | null = null;
-        let onDisconnectedListener: ((error: any, device: any) => void) | null = null;
+        let onDisconnListener: ((error: any, dev: any) => void) | null = null;
+        let isMockConnected = true;
         let bytesReceived = 0;
         let expectedBytes = 0;
 
         const fakeDevice: Device = {
           id: "MOCK-DEVICE",
           name: "AiRide Helmet (MOCK)",
-          isConnected: async () => true,
+          isConnected: async () => isMockConnected,
           connect: async () => fakeDevice,
           cancelConnection: async () => {
             console.log("🟦 MOCK: Casco disconnesso");
-            if (onDisconnectedListener) {
-              onDisconnectedListener(null, fakeDevice);
-            }
+            isMockConnected = false;
+            if (onDisconnListener) onDisconnListener(null, fakeDevice);
           },
           onDisconnected: (listener: any) => {
-            console.log("🟦 MOCK: Registrato listener onDisconnected");
-            onDisconnectedListener = listener;
+            console.log("🟦 MOCK: Registrato listener disconnessione");
+            onDisconnListener = listener;
             return {
               remove: () => {
-                onDisconnectedListener = null;
+                onDisconnListener = null;
               }
             };
           },
@@ -145,6 +151,10 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
           },
 
           writeCharacteristicWithResponseForService: async (serviceUUID: string, characteristicUUID: string, base64Value: string) => {
+            if (!isMockConnected) {
+              throw new Error("Device is disconnected");
+            }
+
             try {
               const decoded = base64.decode(base64Value);
               const bytes = Array.from(decoded as string).map(c => c.charCodeAt(0));
@@ -174,16 +184,17 @@ export function HelmetProvider({ children }: { children: React.ReactNode }) {
                     currentListener(null, { value: responseB64 });
                   }
 
-                  // 🔌 SIMULA IL RIAVVIO HARDWARE ESP32 DOPO 400ms DALLA NOTIFICA SUCCESS
+                  // 🔄 SIMULAZIONE REBOOT ESP32 POST-OTA (200ms dopo SUCCESS)
                   setTimeout(() => {
-                    console.log("🟦 MOCK: Simulazione riavvio ESP32 post-OTA (disconnessione hardware)...");
-                    if (onDisconnectedListener) {
-                      onDisconnectedListener(new Error("MOCK: Device disconnected (ESP32 reboot)"), fakeDevice);
-                    }
+                    console.log("🟦 MOCK: ⚡ Simulo riavvio ESP32 post-OTA (disconnessione BLE)...");
+                    isMockConnected = false;
                     setDevice(null);
                     bleService.setConnectedDevice(null);
                     setConnected(false);
-                  }, 400);
+                    if (onDisconnListener) {
+                      onDisconnListener({ message: "ESP32 Reboot Post-OTA" }, fakeDevice);
+                    }
+                  }, 200);
                 }, 800);
               }
               else if (opcode === 0x03) { // CMD_ABORT

@@ -14,6 +14,9 @@ export type NavState = {
     isDemo?: boolean;       // Se siamo in modalità demo
     riskSongUri?: string;   // URI dell'audio del sorpasso
     riskSongStartTime?: number; // Punto di inizio in ms
+    currentSpeedKmh?: number;   // Velocità istantanea (km/h)
+    isHelmetConnected?: boolean; // Stato connessione BLE casco
+    currentCoords?: { latitude: number; longitude: number }; // Coordinate GPS attuali
     rideStats?: {
         currentRideId: string | null;
         maxSpeedKmh: number;
@@ -33,6 +36,8 @@ let currentData: NavState = {
     isNavigating: false,
     riskSongUri: undefined,
     riskSongStartTime: 0,
+    currentSpeedKmh: 0,
+    isHelmetConnected: false,
     rideStats: {
         currentRideId: null,
         maxSpeedKmh: 0,
