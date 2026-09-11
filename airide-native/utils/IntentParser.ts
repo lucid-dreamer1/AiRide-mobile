@@ -37,6 +37,8 @@ export type VoiceIntent =
   | { type: 'NO' }
   | { type: 'UNKNOWN'; rawText: string };
 
+export type ParsedIntent = VoiceIntent;
+
 /**
  * Calcola la distanza di Levenshtein tra due parole per fuzzy matching
  */

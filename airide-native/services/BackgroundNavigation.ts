@@ -21,6 +21,7 @@ import auth from '@react-native-firebase/auth';
 import CallModule from './callModule';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { VoskModelManager } from './VoskModelManager';
+import { geminiVoiceService } from './GeminiVoiceService';
 
 const sleep = (time: number) => new Promise((resolve) => setTimeout(() => resolve(true), time));
 
@@ -697,7 +698,7 @@ const setupVosk = async () => {
                 }
             }
 
-            onResult((res) => {
+            onResult(async (res) => {
                 if (isOtaActive) return;
                 try {
                     const rawText = (typeof res === 'string' ? res : String(res)).toLowerCase().trim();
@@ -752,8 +753,25 @@ const setupVosk = async () => {
                         if (cleanCmd.length > 0) {
                             console.log(`[VOSK RAW] 🔍 Testo comando: "${cleanCmd}"`);
                             const skipCheck = (sessionState !== 'IDLE') || isWithinWindow || hasWakeWord;
-                            const intent = intentParser.parse(cleanCmd, { skipWakeWordCheck: skipCheck });
-                            console.log(`[VOSK RAW] 🤖 Intent rilevato: ${intent.type}`);
+                            let intent = intentParser.parse(cleanCmd, { skipWakeWordCheck: skipCheck });
+                            console.log(`[VOSK RAW] 🤖 Intent locale: ${intent.type}`);
+
+                            // Se l'intento locale è UNKNOWN e Gemini è disponibile, analizza con Gemini AI!
+                            if (intent.type === 'UNKNOWN' && geminiVoiceService.isAvailable()) {
+                                console.log('[Background] 🧠 Intent locale non riconosciuto. Invoco Gemini 2.0 Flash...');
+                                DeviceEventEmitter.emit('Voice_Status', { status: 'thinking' });
+                                const navStore = NavigationStore.get();
+                                const currentDest = (pendingIntent && 'destination' in pendingIntent) ? (pendingIntent as any).destination : null;
+                                const geminiRes = await geminiVoiceService.parseTextWithGemini(cleanCmd, {
+                                    isNavigating: navStore.isNavigating,
+                                    destination: currentDest,
+                                });
+
+                                if (geminiRes?.intent && geminiRes.intent.type !== 'UNKNOWN') {
+                                    console.log(`[Background] 🌟 Gemini ha compreso l'intento: ${geminiRes.intent.type}`);
+                                    intent = geminiRes.intent;
+                                }
+                            }
 
                             if (intent.type !== 'UNKNOWN') {
                                 handleIntent(intent);
