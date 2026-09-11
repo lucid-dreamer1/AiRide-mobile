@@ -143,13 +143,14 @@ ELENCO INTENTI POSSIBILI (campo "type"):
    - "INTERCOM_STATUS": "chi c'è connesso?", "amici in linea".
    - "INTERCOM_REPLAY": "ripeti ultimo messaggio", "cosa ha detto?".
    - "REACH_FRIEND": "raggiungi Marco", "vai da Luca", "dov'è Marco?". Campo "friendName": string.
-6. Telefonia & Conferme:
+6. Telefonia, Aiuto & Conferme:
+   - "GET_HELP": il pilota chiede cosa può dire ("cosa posso dire?", "che posso dire?", "che posso provare a dire?", "quali sono i comandi?", "aiuto", "cosa sai fare?"). ATTENZIONE ASSOLUTA: NON interpretare MAI "che posso dire" come un indirizzo o luogo di navigazione (es. Dennis Port)! Restituisci sempre "GET_HELP".
    - "CALL_CONTACT": chiamare un contatto telefonico vivavoce. Campo "contactName".
    - "ANSWER_CALL": rispondere a chiamata in arrivo.
    - "HANG_UP": chiudere la chiamata.
    - "YES": sì, confermo, procedi, vai, d'accordo.
    - "NO": no, annulla, aspetta, non voglio.
-   - "UNKNOWN": frase incomprensibile o non pertinente alla guida moto.
+   - "UNKNOWN": frase incomprensibile o rumore non pertinente alla guida moto.
 
 FORMATO RISPOSTA (SOLO JSON, NIENTE TESTO EXTRA, NIENTE BACKTICKS MARKDOWN):
 {
@@ -260,7 +261,7 @@ FORMATO RISPOSTA (SOLO JSON, NIENTE TESTO EXTRA, NIENTE BACKTICKS MARKDOWN):
 
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 6000);
+        const timer = setTimeout(() => controller.abort(), 10000);
 
         const response = await fetch(url, {
           method: 'POST',

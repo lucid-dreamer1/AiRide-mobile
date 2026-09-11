@@ -33,6 +33,7 @@ export type VoiceIntent =
   | { type: 'INTERCOM_REPLAY' }
   | { type: 'INTERCOM_STATUS' }
   | { type: 'REACH_FRIEND'; friendName: string }
+  | { type: 'GET_HELP' }
   | { type: 'YES' }
   | { type: 'NO' }
   | { type: 'UNKNOWN'; rawText: string };
@@ -144,6 +145,7 @@ export class IntentParser {
   private timeRegex         = /che\s+ore\s+sono|che\s+ora\s+è|orario|che ore fa|what time is it|quelle heure est.?il|wie spät ist es|qué hora es/i;
   private remainingRegex    = /quanto\s+manca|distanza\s+rimanente|quanti chilometri mancano|chilometri rimanenti|how much further|how far|combien reste.?t.?il|wie weit noch|cuánto falta/i;
   private notificationRegex = /ho\s+notifiche|leggi\s+notifiche|controlla\s+notifiche|any notifications|mes notifications|meine Benachrichtigungen|mis notificaciones/i;
+  private helpRegex         = /\b(cosa\s+(posso|devo)\s+dire|che\s+posso(\s+provare\s+a)?\s+dire|aiuto|help|quali\s+(sono\s+i\s+)?comandi|cosa\s+puoi\s+fare|istruzioni|guida\s+comandi)\b/i;
 
   // ─────────────────────────────────────────
   // CHIAMATE
@@ -349,6 +351,7 @@ export class IntentParser {
     if (this.timeRegex.test(cmd))         return { type: 'GET_TIME' };
     if (this.remainingRegex.test(cmd))    return { type: 'GET_REMAINING_INFO' };
     if (this.notificationRegex.test(cmd)) return { type: 'CHECK_NOTIFICATIONS' };
+    if (this.helpRegex.test(cmd))         return { type: 'GET_HELP' };
 
     // 7. GESTIONE ROTTA & CANCELLAZIONE
     if (this.avoidHighwaysRegex.test(cmd)) return { type: 'CHANGE_ROUTE', avoid: ['highways'] };

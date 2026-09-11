@@ -265,6 +265,9 @@ const TTS_COOLDOWN_MS = 900; // ms di silenzio dopo il TTS prima di riascoltare
 let ttsSafetyTimer: any = null;
 
 let lastTTSEndTime = 0;
+let isGeminiQuerying = false;
+let lastGeminiQueryText = '';
+let lastGeminiQueryTime = 0;
 
 const clearTTSFlag = (delay = TTS_COOLDOWN_MS) => {
     if (ttsSafetyTimer) clearTimeout(ttsSafetyTimer);
@@ -662,6 +665,12 @@ const handleIntent = (intent: VoiceIntent) => {
             }
             break;
         }
+
+        case 'GET_HELP': {
+            speak('Puoi chiedermi di impostare una rotta, trovare distributori o cibo, mettere la radio, parlare all\'interfono o consultare la velocità.');
+            DeviceEventEmitter.emit('Voice_Show_Commands');
+            break;
+        }
             
         default:
             // YES/NO in IDLE non hanno senso — li ignoriamo silenziosamente
@@ -758,18 +767,36 @@ const setupVosk = async () => {
 
                             // Se l'intento locale è UNKNOWN e Gemini è disponibile, analizza con Gemini AI!
                             if (intent.type === 'UNKNOWN' && geminiVoiceService.isAvailable()) {
-                                console.log('[Background] 🧠 Intent locale non riconosciuto. Invoco Gemini 2.0 Flash...');
-                                DeviceEventEmitter.emit('Voice_Status', { status: 'thinking' });
-                                const navStore = NavigationStore.get();
-                                const currentDest = (pendingIntent && 'destination' in pendingIntent) ? (pendingIntent as any).destination : null;
-                                const geminiRes = await geminiVoiceService.parseTextWithGemini(cleanCmd, {
-                                    isNavigating: navStore.isNavigating,
-                                    destination: currentDest,
-                                });
+                                const now = Date.now();
+                                if (isGeminiQuerying) {
+                                    console.log('[Background] ⏳ Gemini già in elaborazione, ignoro evento duplicato.');
+                                    return;
+                                }
+                                if (cleanCmd === lastGeminiQueryText && (now - lastGeminiQueryTime < 3000)) {
+                                    console.log('[Background] 🔇 Query identica troppo recente, ignoro duplicato.');
+                                    return;
+                                }
 
-                                if (geminiRes?.intent && geminiRes.intent.type !== 'UNKNOWN') {
-                                    console.log(`[Background] 🌟 Gemini ha compreso l'intento: ${geminiRes.intent.type}`);
-                                    intent = geminiRes.intent;
+                                isGeminiQuerying = true;
+                                lastGeminiQueryText = cleanCmd;
+                                lastGeminiQueryTime = now;
+
+                                try {
+                                    console.log('[Background] 🧠 Intent locale non riconosciuto. Invoco Gemini AI...');
+                                    DeviceEventEmitter.emit('Voice_Status', { status: 'thinking' });
+                                    const navStore = NavigationStore.get();
+                                    const currentDest = (pendingIntent && 'destination' in pendingIntent) ? (pendingIntent as any).destination : null;
+                                    const geminiRes = await geminiVoiceService.parseTextWithGemini(cleanCmd, {
+                                        isNavigating: navStore.isNavigating,
+                                        destination: currentDest,
+                                    });
+
+                                    if (geminiRes?.intent && geminiRes.intent.type !== 'UNKNOWN') {
+                                        console.log(`[Background] 🌟 Gemini ha compreso l'intento: ${geminiRes.intent.type}`);
+                                        intent = geminiRes.intent;
+                                    }
+                                } finally {
+                                    isGeminiQuerying = false;
                                 }
                             }
 
