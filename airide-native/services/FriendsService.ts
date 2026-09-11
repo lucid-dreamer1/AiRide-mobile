@@ -344,6 +344,7 @@ class FriendsService {
       }
 
       // Aggiungi reciprocamente l'amico
+      // Aggiungi l'amico al proprio documento utente
       const userRef = firebaseFirestore.collection('users').doc(this.currentUserId);
       const targetRef = firebaseFirestore.collection('users').doc(targetUid);
 
@@ -355,10 +356,15 @@ class FriendsService {
         updatedAt: Date.now(),
       });
 
-      await targetRef.update({
-        friends: FieldValue.arrayUnion(this.currentUserId),
-        updatedAt: Date.now(),
-      });
+      // Aggiunta reciproca (se permessa dalle regole di sicurezza)
+      try {
+        await targetRef.update({
+          friends: FieldValue.arrayUnion(this.currentUserId),
+          updatedAt: Date.now(),
+        });
+      } catch (targetErr) {
+        console.log('[FriendsService] Nota: targetRef update non consentito o fallito, amicizia salvata localmente:', targetErr);
+      }
 
       const targetData = targetDoc.data();
       const friendProfile: FriendProfile = {
