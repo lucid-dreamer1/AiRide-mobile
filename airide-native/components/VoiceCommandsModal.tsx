@@ -34,6 +34,39 @@ interface CommandCategory {
 
 const COMMAND_CATEGORIES: CommandCategory[] = [
   {
+    id: 'intercom',
+    title: 'Interfono & Amici',
+    icon: 'users',
+    color: '#10B981',
+    items: [
+      {
+        command: '"Ciao casco, accendi interfono"',
+        description: 'Attiva la linea interfono vocale hands-free con i tuoi compagni di moto.',
+        example: '"Hey casco, attiva interfono" o "Ciao casco, apri interfono"',
+      },
+      {
+        command: '"Ciao casco, spegni interfono"',
+        description: 'Chiude la trasmissione interfono e disattiva il microfono.',
+        example: '"Hey casco, disattiva interfono" o "Ciao casco, chiudi interfono"',
+      },
+      {
+        command: '"Ciao casco, raggiungi [Nome Compagno]"',
+        description: 'Recupera la posizione GPS in tempo reale del tuo amico e avvia la navigazione verso di lui.',
+        example: '"Ciao casco, raggiungi Marco" o "Hey casco, vai da Luca"',
+      },
+      {
+        command: '"Ciao casco, chi c\'è connesso?"',
+        description: 'Elenca a voce i nomi dei compagni di viaggio attivi sull\'interfono.',
+        example: '"Hey casco, stato interfono"',
+      },
+      {
+        command: '"Ciao casco, ripeti ultimo messaggio"',
+        description: 'Riascolta l\'ultima comunicazione vocale inviata da un amico se persa a causa del vento.',
+        example: '"Hey casco, cosa ha detto?"',
+      },
+    ],
+  },
+  {
     id: 'radio',
     title: 'Web Radio & Musica',
     icon: 'radio',

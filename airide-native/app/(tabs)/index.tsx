@@ -53,6 +53,9 @@ import { VoicePriority } from "@/types/voice";
 import { radioService, RadioState } from "@/services/RadioService";
 import { RadioPlayerWidget } from "@/components/RadioPlayerWidget";
 import { VoiceCommandsModal } from "@/components/VoiceCommandsModal";
+import { friendsService, FriendProfile } from "@/services/FriendsService";
+import { intercomService, IntercomState } from "@/services/IntercomService";
+import { FriendsRadarModal } from "@/components/FriendsRadarModal";
 
 const DEMO_MODE = true;
 
@@ -116,6 +119,11 @@ export default function HomeScreen() {
   const [showVoiceHelp, setShowVoiceHelp] = useState(false);
   const [radioState, setRadioState] = useState<RadioState>(radioService.getState());
   
+  // Amici & Interfono Hands-Free
+  const [friends, setFriends] = useState<FriendProfile[]>(friendsService.getFriends());
+  const [showFriendsModal, setShowFriendsModal] = useState(false);
+  const [intercomState, setIntercomState] = useState<IntercomState>(intercomService.getState());
+  
   const [showOnboarding, setShowOnboarding] = useState(false); // <--- New State
 
   const [isNavigating, setIsNavigating] = useState(false); // <--- NUOVO STATO
@@ -144,6 +152,48 @@ export default function HomeScreen() {
       sub.remove();
     };
   }, []);
+
+  // -------------------------------------------------------------
+  // AMICI & INTERFONO LISTENER & GPS RADAR SYNC
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (user) {
+      friendsService.init(user);
+      intercomService.setUser(user);
+      setFriends(friendsService.getFriends());
+    }
+    const subFriends = DeviceEventEmitter.addListener('Friends_Updated', (data: any) => {
+      setFriends(data.friends || []);
+    });
+    const subIntercom = DeviceEventEmitter.addListener('Intercom_StateChanged', (state: IntercomState) => {
+      setIntercomState({ ...state });
+    });
+    return () => {
+      subFriends.remove();
+      subIntercom.remove();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (currentPosition) {
+      friendsService.updateMyLocation({
+        latitude: currentPosition.latitude,
+        longitude: currentPosition.longitude,
+        speedKmh: currentSpeedKmh,
+      });
+    }
+  }, [currentPosition, currentSpeedKmh]);
+
+  const handleNavigateToFriend = async (friend: FriendProfile) => {
+    if (!friend.location) {
+      Toast.show({ type: 'info', text1: 'Posizione non disponibile' });
+      return;
+    }
+    const coords = `${friend.location.latitude},${friend.location.longitude}`;
+    setDestination(friend.displayName);
+    ttsService.speak(`Imposto la navigazione verso ${friend.displayName}.`, VoicePriority.HIGH);
+    await fetchRoute(coords);
+  };
 
   // -------------------------------------------------------------
   // ONBOARDING CHECK
@@ -1066,6 +1116,79 @@ export default function HomeScreen() {
           }
           break;
         }
+
+        // 👥 INTERFONO HANDS-FREE & COMPAGNI DI VIAGGIO
+        case 'INTERCOM_ON': {
+          console.log('[HomeScreen] Eseguo INTERCOM_ON');
+          (async () => {
+            await intercomService.turnOn();
+            Toast.show({
+              type: 'success',
+              text1: '🎙️ Interfono Acceso',
+              text2: 'Sei in linea hands-free con i compagni',
+            });
+            ttsService.speak('Interfono acceso. Sei in linea con i tuoi compagni.', VoicePriority.HIGH);
+          })();
+          break;
+        }
+
+        case 'INTERCOM_OFF': {
+          console.log('[HomeScreen] Eseguo INTERCOM_OFF');
+          (async () => {
+            await intercomService.turnOff();
+            Toast.show({
+              type: 'info',
+              text1: '🔇 Interfono Spento',
+              text2: 'Microfono chiuso',
+            });
+            ttsService.speak('Interfono disattivato.', VoicePriority.HIGH);
+          })();
+          break;
+        }
+
+        case 'INTERCOM_REPLAY': {
+          console.log('[HomeScreen] Eseguo INTERCOM_REPLAY');
+          (async () => {
+            const played = await intercomService.replayLastMessage();
+            if (!played) {
+              ttsService.speak('Nessun messaggio recente da riascoltare.', VoicePriority.HIGH);
+            }
+          })();
+          break;
+        }
+
+        case 'INTERCOM_STATUS': {
+          console.log('[HomeScreen] Eseguo INTERCOM_STATUS');
+          const st = intercomService.getState();
+          const activeFriends = friends.filter(f => f.isOnline);
+          if (!st.isOn) {
+            ttsService.speak(`L'interfono è spento. Ci sono ${activeFriends.length} compagni attivi. Dì Ciao casco accendi interfono per parlare.`, VoicePriority.HIGH);
+          } else {
+            const names = activeFriends.map(f => f.displayName).join(', ');
+            ttsService.speak(`Interfono attivo. Compagni in linea: ${names || 'nessun compagno al momento'}.`, VoicePriority.HIGH);
+          }
+          break;
+        }
+
+        case 'REACH_FRIEND': {
+          console.log('[HomeScreen] Eseguo REACH_FRIEND:', intent.friendName);
+          const target = friendsService.findFriendByName(intent.friendName);
+          if (!target) {
+            ttsService.speak(`Non ho trovato nessun compagno con il nome ${intent.friendName} nella tua lista amici.`, VoicePriority.HIGH);
+            break;
+          }
+          if (!target.isLocationShared || !target.location) {
+            ttsService.speak(`${target.displayName} non condivide la sua posizione GPS o è offline al momento.`, VoicePriority.HIGH);
+            break;
+          }
+          (async () => {
+            const destCoords = `${target.location!.latitude},${target.location!.longitude}`;
+            setDestination(target.displayName);
+            ttsService.speak(`Calcolo il percorso per raggiungere ${target.displayName}.`, VoicePriority.HIGH);
+            await fetchRoute(destCoords);
+          })();
+          break;
+        }
       }
     },
   });
@@ -1164,6 +1287,33 @@ export default function HomeScreen() {
           </Marker>
         )}
 
+        {/* 🔹 AMICI / COMPAGNI DI MOTO RADAR ON MAP */}
+        {friends.map((friend) => {
+          if (!friend.isLocationShared || !friend.location) return null;
+          return (
+            <Marker
+              key={`friend-${friend.uid}`}
+              coordinate={{
+                latitude: friend.location.latitude,
+                longitude: friend.location.longitude,
+              }}
+              title={friend.displayName}
+              description={`Velocità: ${Math.round(friend.location.speedKmh || 0)} km/h`}
+              onPress={() => setShowFriendsModal(true)}
+            >
+              <View style={styles.friendMarkerContainer}>
+                <View style={[styles.friendMarkerBubble, { borderColor: friend.intercomActive ? '#10B981' : themeColors.accent }]}>
+                  <Feather name="user" size={12} color={themeColors.accent} />
+                  <Text style={styles.friendMarkerText} numberOfLines={1}>
+                    {friend.displayName.split(' ')[0]}
+                  </Text>
+                </View>
+                <View style={styles.friendMarkerArrow} />
+              </View>
+            </Marker>
+          );
+        })}
+
         {routeCoords.length > 0 && (
           <Polyline
             coordinates={routeCoords}
@@ -1239,6 +1389,28 @@ export default function HomeScreen() {
         />
         {radioState.isPlaying && (
           <View style={styles.radioFabLiveDot} />
+        )}
+      </TouchableOpacity>
+
+      {/* 🔹 AMICI & INTERFONO FAB */}
+      <TouchableOpacity
+        onPress={() => setShowFriendsModal(true)}
+        style={[
+          styles.friendsFab,
+          {
+            backgroundColor: intercomState.isOn ? '#10B981' : themeColors.card,
+            borderWidth: 2,
+            borderColor: intercomState.isOn ? '#10B981' : themeColors.accent,
+          },
+        ]}
+      >
+        <Feather
+          name="users"
+          size={22}
+          color={intercomState.isOn ? '#0B101B' : themeColors.accent}
+        />
+        {intercomState.isOn && (
+          <View style={styles.intercomFabLiveDot} />
         )}
       </TouchableOpacity>
 
@@ -1421,6 +1593,15 @@ export default function HomeScreen() {
         accentColor={themeColors.accent}
       />
 
+      {/* MODAL AMICI & RADAR COMPAGNI */}
+      <FriendsRadarModal
+        visible={showFriendsModal}
+        onClose={() => setShowFriendsModal(false)}
+        accentColor={themeColors.accent}
+        myPosition={currentPosition}
+        onNavigateToFriend={handleNavigateToFriend}
+      />
+
     </View>
   );
 }
@@ -1576,6 +1757,65 @@ const createStyles = (colors: any) =>
       borderColor: "#0B101B",
     },
 
+    friendsFab: {
+      position: "absolute",
+      top: 135,
+      right: 144,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      justifyContent: "center",
+      alignItems: "center",
+      elevation: 8,
+    },
+
+    intercomFabLiveDot: {
+      position: "absolute",
+      top: 9,
+      right: 9,
+      width: 9,
+      height: 9,
+      borderRadius: 4.5,
+      backgroundColor: "#10B981",
+      borderWidth: 1.5,
+      borderColor: "#0B101B",
+    },
+
+    friendMarkerContainer: {
+      alignItems: 'center',
+    },
+
+    friendMarkerBubble: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(15, 23, 42, 0.94)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      gap: 4,
+      elevation: 5,
+    },
+
+    friendMarkerText: {
+      color: '#F8FAFC',
+      fontSize: 11,
+      fontWeight: '700',
+      maxWidth: 80,
+    },
+
+    friendMarkerArrow: {
+      width: 0,
+      height: 0,
+      borderLeftWidth: 5,
+      borderRightWidth: 5,
+      borderTopWidth: 5,
+      borderLeftColor: 'transparent',
+      borderRightColor: 'transparent',
+      borderTopColor: 'rgba(15, 23, 42, 0.94)',
+      alignSelf: 'center',
+    },
+
     blePanel: {
       position: "absolute",
       top: 200,
@@ -1591,8 +1831,8 @@ const createStyles = (colors: any) =>
 
     resetFab: {
       position: "absolute",
-      top: 135,
-      right: 144, // A sinistra del Radio FAB
+      top: 198,
+      right: 20,
       width: 52,
       height: 52,
       borderRadius: 26,

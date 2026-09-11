@@ -27,6 +27,11 @@ export type VoiceIntent =
   | { type: 'RADIO_PREV' }
   | { type: 'RADIO_VOLUME'; level: 'up' | 'down' | number }
   | { type: 'RADIO_INFO' }
+  | { type: 'INTERCOM_ON' }
+  | { type: 'INTERCOM_OFF' }
+  | { type: 'INTERCOM_REPLAY' }
+  | { type: 'INTERCOM_STATUS' }
+  | { type: 'REACH_FRIEND'; friendName: string }
   | { type: 'YES' }
   | { type: 'NO' }
   | { type: 'UNKNOWN'; rawText: string };
@@ -143,6 +148,15 @@ export class IntentParser {
   private callRegex   = /(?:chiama|telefona a|chiama a|call|appelle|ruf|llama)\s+(.*)/i;
   private answerRegex = /rispondi|pronto|rispondere|accetta chiamata|answer|répondre|annehmen|contestar/i;
   private hangupRegex = /attacca|termina chiamata|chiudi chiamata|metti giù|rifiuta chiamata|hang up|raccrocher|auflegen|colgar/i;
+
+  // ─────────────────────────────────────────
+  // INTERFONO & RADAR COMPAGNI HANDS-FREE
+  // ─────────────────────────────────────────
+  private intercomOnRegex     = /\b(accendi|attiva|apri|collega|connetti|avvia|start)\s+(il\s+|l['’])?interfono\b/i;
+  private intercomOffRegex    = /\b(spegni|spengi|stoppa|ferma|chiudi|disattiva|stacca|disconnetti|stop)\s+(il\s+|l['’])?interfono\b/i;
+  private intercomStatusRegex = /\b(chi\s+(c['’]è|è\s+connesso)|stato\s+interfono|amici\s+online|amici\s+in\s+linea)\b/i;
+  private intercomReplayRegex = /\b(ripeti\s+(l['’])?ultimo\s+messaggio|cosa\s+ha\s+detto|ripeti\s+interfono|ripeti\s+amico)\b/i;
+  private reachFriendRegex    = /\b(raggiungi|vai\s+da|porta\s+da|conducimi\s+da|trova|segui)\s+([a-zA-ZàèéìòùÀÈÉÌÒÙ]+)/i;
 
   // ─────────────────────────────────────────
   // WEB RADIO & STREAMING MUSICALE
@@ -344,7 +358,22 @@ export class IntentParser {
       return { type: 'CHANGE_ROUTE' };
     }
 
-    // 8. CONTROLLI RADIO & STREAMING MUSICALE
+    // 8. CONTROLLI INTERFONO HANDS-FREE & COMPAGNI
+    if (this.intercomOnRegex.test(cmd))     return { type: 'INTERCOM_ON' };
+    if (this.intercomOffRegex.test(cmd))    return { type: 'INTERCOM_OFF' };
+    if (this.intercomReplayRegex.test(cmd)) return { type: 'INTERCOM_REPLAY' };
+    if (this.intercomStatusRegex.test(cmd)) return { type: 'INTERCOM_STATUS' };
+
+    const reachMatch = cmd.match(this.reachFriendRegex);
+    if (reachMatch && reachMatch[2]) {
+      const targetFriend = reachMatch[2].trim();
+      // Escludi parole chiave di navigazione generica
+      if (!this.homeRegex.test(targetFriend) && !this.workRegex.test(targetFriend) && !this.gasStationRegex.test(targetFriend) && !this.foodRegex.test(targetFriend)) {
+        return { type: 'REACH_FRIEND', friendName: targetFriend };
+      }
+    }
+
+    // 9. CONTROLLI RADIO & STREAMING MUSICALE
     const isRadioContext = /\b(radio|stazione|musica|brano|canzone)\b/i.test(cmd);
 
     // STOP HA PRECEDENZA ASSOLUTA: non deve MAI avviare la radio!
