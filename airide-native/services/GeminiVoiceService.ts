@@ -5,8 +5,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ParsedIntent } from '../utils/IntentParser';
 
 const STORAGE_GEMINI_KEY = '@airide_gemini_api_key';
-const GEMINI_MODEL = 'gemini-2.0-flash';
-const GEMINI_FALLBACK_MODEL = 'gemini-1.5-flash';
+const GEMINI_MODELS = [
+  'gemini-3.5-flash-lite',
+  'gemini-flash-latest',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-flash-lite-latest',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-flash',
+];
 
 export interface GeminiIntentResult {
   intent: ParsedIntent;
@@ -236,29 +243,39 @@ FORMATO RISPOSTA (SOLO JSON, NIENTE TESTO EXTRA, NIENTE BACKTICKS MARKDOWN):
     return await this._callGeminiAPI(payload, key);
   }
 
+  private workingModel: string | null = null;
+
   /**
    * Esegue la chiamata HTTP REST verso Google Gemini
    */
   private async _callGeminiAPI(payload: any, key: string): Promise<GeminiIntentResult | null> {
-    const modelsToTry = [GEMINI_MODEL, GEMINI_FALLBACK_MODEL];
+    // Se abbiamo già un modello funzionante per questa chiave, provalo per primo
+    const modelsToTry = this.workingModel
+      ? [this.workingModel, ...GEMINI_MODELS.filter(m => m !== this.workingModel)]
+      : GEMINI_MODELS;
 
     for (const model of modelsToTry) {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
       const startTime = Date.now();
 
       try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 6000);
+
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
+          signal: controller.signal,
         });
+        clearTimeout(timer);
 
         const elapsed = Date.now() - startTime;
 
         if (!response.ok) {
           const errText = await response.text();
-          console.warn(`[GeminiVoiceService] HTTP ${response.status} da ${model} (${elapsed}ms):`, errText);
-          // Se il modello non è supportato o fallisce, prova il fallback
+          console.warn(`[GeminiVoiceService] HTTP ${response.status} da ${model} (${elapsed}ms):`, errText.slice(0, 150));
+          // Se il modello non è supportato o fallisce, prova il successivo
           continue;
         }
 
@@ -270,7 +287,8 @@ FORMATO RISPOSTA (SOLO JSON, NIENTE TESTO EXTRA, NIENTE BACKTICKS MARKDOWN):
           continue;
         }
 
-        console.log(`[GeminiVoiceService] ⚡ Risposta Gemini (${elapsed}ms):`, candidate);
+        console.log(`[GeminiVoiceService] ⚡ Risposta da ${model} (${elapsed}ms):`, candidate);
+        this.workingModel = model; // Salva il modello che ha risposto con successo
 
         // Parsing JSON pulito
         const cleanedJson = candidate.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
