@@ -86,8 +86,9 @@ class TTSService {
     try {
       this.speaking = true;
       this.currentMessage = message;
+      DeviceEventEmitter.emit('TTS_START');
 
-    const mergedOptions = { ...this.defaultOptions, ...options };
+      const mergedOptions = { ...this.defaultOptions, ...options };
 
       console.log(`[TTS] 🔊 Speaking: "${message.text}"`); 
 

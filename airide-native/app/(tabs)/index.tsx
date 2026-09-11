@@ -50,6 +50,8 @@ import * as Contacts from 'expo-contacts';
 import { NavigationStore } from "@/services/NavigationStore"; // <--- Import Store
 import { ttsService } from "@/services/TTSService";
 import { VoicePriority } from "@/types/voice";
+import { radioService } from "@/services/RadioService";
+import { RadioPlayerWidget } from "@/components/RadioPlayerWidget";
 
 const DEMO_MODE = true;
 
@@ -947,6 +949,94 @@ export default function HomeScreen() {
           console.log('📞 Chiudo la chiamata...');
           CallModule.hangUp();
           break;
+
+        // 📻 WEB RADIO & STREAMING
+        case 'RADIO_PLAY': {
+          console.log('[HomeScreen] Eseguo RADIO_PLAY:', intent.station);
+          (async () => {
+            const station = await radioService.play(intent.station);
+            if (station) {
+              Toast.show({
+                type: 'success',
+                text1: '📻 Web Radio',
+                text2: `Sintonizzato su ${station.name}`,
+              });
+              ttsService.speak(`Sintonizzato su ${station.name}`, VoicePriority.HIGH);
+            } else {
+              ttsService.speak("Impossibile connettersi alla stazione radio.", VoicePriority.HIGH);
+            }
+          })();
+          break;
+        }
+
+        case 'RADIO_STOP': {
+          console.log('[HomeScreen] Eseguo RADIO_STOP');
+          (async () => {
+            await radioService.stop();
+            Toast.show({
+              type: 'info',
+              text1: '📻 Web Radio',
+              text2: 'Riproduzione interrotta',
+            });
+            ttsService.speak("Radio disattivata.", VoicePriority.HIGH);
+          })();
+          break;
+        }
+
+        case 'RADIO_NEXT': {
+          console.log('[HomeScreen] Eseguo RADIO_NEXT');
+          (async () => {
+            const nextStation = await radioService.next();
+            Toast.show({
+              type: 'success',
+              text1: '📻 Web Radio',
+              text2: nextStation.name,
+            });
+            ttsService.speak(`Passo a ${nextStation.name}`, VoicePriority.HIGH);
+          })();
+          break;
+        }
+
+        case 'RADIO_PREV': {
+          console.log('[HomeScreen] Eseguo RADIO_PREV');
+          (async () => {
+            const prevStation = await radioService.prev();
+            Toast.show({
+              type: 'success',
+              text1: '📻 Web Radio',
+              text2: prevStation.name,
+            });
+            ttsService.speak(`Passo a ${prevStation.name}`, VoicePriority.HIGH);
+          })();
+          break;
+        }
+
+        case 'RADIO_VOLUME': {
+          console.log('[HomeScreen] Eseguo RADIO_VOLUME:', intent.level);
+          const delta = intent.level === 'up' ? 0.15 : intent.level === 'down' ? -0.15 : 0;
+          (async () => {
+            const newVol = await radioService.adjustVolume(delta);
+            const pct = Math.round(newVol * 100);
+            Toast.show({
+              type: 'info',
+              text1: '🔊 Volume Radio',
+              text2: `${pct}%`,
+            });
+            ttsService.speak(`Volume radio ${pct} percento`, VoicePriority.HIGH);
+          })();
+          break;
+        }
+
+        case 'RADIO_INFO': {
+          console.log('[HomeScreen] Eseguo RADIO_INFO');
+          const st = radioService.getState();
+          if (st.isPlaying && st.currentStation) {
+            ttsService.speak(`Stai ascoltando ${st.currentStation.name}, genere ${st.currentStation.genre}`, VoicePriority.HIGH);
+          } else {
+            ttsService.speak("La radio non è attiva in questo momento.", VoicePriority.HIGH);
+          }
+          break;
+        }
       }
     },
   });
@@ -1215,6 +1305,11 @@ export default function HomeScreen() {
       {showInstructionCard && (
         <InstructionCard instruction={currentInstruction} />
       )}
+
+      {/* 📻 WEB RADIO MINI-PLAYER */}
+      <View style={[styles.radioWidgetWrapper, { bottom: isNavigating ? 220 : 126 }]}>
+        <RadioPlayerWidget accentColor={themeColors.accent} />
+      </View>
 
       {/* SEND BUTTON */}
       <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
@@ -1493,5 +1588,12 @@ const createStyles = (colors: any) =>
         color: "white",
         fontSize: 16,
         fontWeight: "bold",
+    },
+
+    radioWidgetWrapper: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      zIndex: 900,
     },
   });

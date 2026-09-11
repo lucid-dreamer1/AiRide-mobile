@@ -270,6 +270,7 @@ const clearTTSFlag = (delay = TTS_COOLDOWN_MS) => {
     ttsSafetyTimer = setTimeout(() => {
         isTTSSpeaking = false;
         lastTTSEndTime = Date.now();
+        DeviceEventEmitter.emit('TTS_DONE');
         console.log('[Background] ✅ TTS terminato — Vosk riprende ad ascoltare');
     }, delay);
 };
@@ -278,6 +279,7 @@ const speak = (text: string, langOverride?: string, onFinished?: () => void) => 
     const langCode = LANG_CODE_MAP[langOverride || voiceSettings.language] || 'it-IT';
     console.log(`[Background] 🗣️ TTS (${langCode}): "${text}"`);
     isTTSSpeaking = true;
+    DeviceEventEmitter.emit('TTS_START');
 
     let hasFinished = false;
     const triggerFinished = () => {
