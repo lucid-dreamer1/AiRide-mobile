@@ -185,7 +185,41 @@ public class AiRideCallModule extends ReactContextBaseJavaModule {
         android.util.Log.d("AiRideCallModule", "startBluetoothSco called");
         try {
             android.media.AudioManager audioManager = (android.media.AudioManager) reactContext.getSystemService(Context.AUDIO_SERVICE);
-            if (audioManager != null) {
+            if (audioManager == null) return;
+
+            android.bluetooth.BluetoothAdapter btAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+            if (btAdapter == null || !btAdapter.isEnabled()) {
+                android.util.Log.d("AiRideCallModule", "Bluetooth disabled, keeping SCO off for device speakers");
+                audioManager.setBluetoothScoOn(false);
+                audioManager.stopBluetoothSco();
+                return;
+            }
+
+            boolean hasBtAudioDevice = false;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                android.media.AudioDeviceInfo[] devices = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS);
+                if (devices != null) {
+                    for (android.media.AudioDeviceInfo dev : devices) {
+                        int type = dev.getType();
+                        if (type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                            type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                            type == 26 /* TYPE_BLE_HEADSET */ ||
+                            type == 27 /* TYPE_BLE_SPEAKER */) {
+                            hasBtAudioDevice = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!hasBtAudioDevice) {
+                android.util.Log.d("AiRideCallModule", "No Bluetooth headset connected, keeping SCO off so built-in speakers work");
+                audioManager.setBluetoothScoOn(false);
+                audioManager.stopBluetoothSco();
+                return;
+            }
+
+            if (audioManager.isBluetoothScoAvailableOffCall()) {
                 audioManager.startBluetoothSco();
                 audioManager.setBluetoothScoOn(true);
             }
@@ -205,6 +239,36 @@ public class AiRideCallModule extends ReactContextBaseJavaModule {
             }
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    @ReactMethod
+    public void isBluetoothHeadsetConnected(com.facebook.react.bridge.Promise promise) {
+        try {
+            android.media.AudioManager audioManager = (android.media.AudioManager) reactContext.getSystemService(Context.AUDIO_SERVICE);
+            android.bluetooth.BluetoothAdapter btAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+            if (audioManager == null || btAdapter == null || !btAdapter.isEnabled()) {
+                promise.resolve(false);
+                return;
+            }
+            boolean connected = false;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                android.media.AudioDeviceInfo[] devices = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS);
+                if (devices != null) {
+                    for (android.media.AudioDeviceInfo dev : devices) {
+                        int type = dev.getType();
+                        if (type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                            type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                            type == 26 || type == 27) {
+                            connected = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            promise.resolve(connected);
+        } catch (Exception e) {
+            promise.resolve(false);
         }
     }
 }

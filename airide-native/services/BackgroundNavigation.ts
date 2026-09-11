@@ -302,6 +302,7 @@ const speak = (text: string, langOverride?: string, onFinished?: () => void) => 
 
     Speech.speak(text, {
         language: langCode,
+        volume: 1.0,
         onDone: () => {
             clearTTSFlag(TTS_COOLDOWN_MS);
             setTimeout(triggerFinished, TTS_COOLDOWN_MS);
@@ -811,8 +812,15 @@ const setupVosk = async () => {
         } catch(e) {}
 
         console.log('[Background] 🎙️ Avvio Vosk (Start)...');
-        // Abilita microfono auricolari Bluetooth se presenti
-        CallModule.startBluetoothSco();
+        // Abilita microfono auricolari Bluetooth SOLO se connessi
+        const isBtHeadset = await CallModule.isBluetoothHeadsetConnected();
+        if (isBtHeadset) {
+            console.log('[Background] 🎧 Headset Bluetooth connesso -> Attivo Bluetooth SCO per microfono casco');
+            CallModule.startBluetoothSco();
+        } else {
+            console.log('[Background] 📱 Nessun headset Bluetooth connesso -> Uso microfono e altoparlanti integrati');
+            CallModule.stopBluetoothSco();
+        }
 
         // Non awaitiamo all'infinito.
         startVosk().then(() => {
@@ -935,7 +943,12 @@ const navigationTask = async (taskDataArguments: any) => {
             try { stopVosk(); } catch(e) {}
             await sleep(400);
 
-            CallModule.startBluetoothSco();
+            const isBtHeadset = await CallModule.isBluetoothHeadsetConnected();
+            if (isBtHeadset) {
+                CallModule.startBluetoothSco();
+            } else {
+                CallModule.stopBluetoothSco();
+            }
             try {
                 await startVosk();
             } catch (err: any) {

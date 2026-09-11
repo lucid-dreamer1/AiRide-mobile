@@ -78,6 +78,17 @@ const CallModule = {
     }
   },
 
+  isBluetoothHeadsetConnected: async () => {
+    if (Platform.OS === 'android' && AiRideCallModule?.isBluetoothHeadsetConnected) {
+      try {
+        return await AiRideCallModule.isBluetoothHeadsetConnected();
+      } catch (e) {
+        return false;
+      }
+    }
+    return false;
+  },
+
   addCallListener: (callback) => {
     if (Platform.OS === 'android') {
         return DeviceEventEmitter.addListener('CallRinging', callback);
