@@ -168,13 +168,9 @@ export default function HomeScreen() {
     const subIntercom = DeviceEventEmitter.addListener('Intercom_StateChanged', (state: IntercomState) => {
       setIntercomState({ ...state });
     });
-    const subHelp = DeviceEventEmitter.addListener('Voice_Show_Commands', () => {
-      setShowVoiceHelp(true);
-    });
     return () => {
       subFriends.remove();
       subIntercom.remove();
-      subHelp.remove();
     };
   }, [user]);
 
@@ -1210,12 +1206,6 @@ export default function HomeScreen() {
             ttsService.speak(`Calcolo il percorso per raggiungere ${target.displayName}.`, VoicePriority.HIGH);
             await fetchRoute(destCoords);
           })();
-          break;
-        }
-
-        case 'GET_HELP': {
-          setShowVoiceHelp(true);
-          ttsService.speak('Ecco la guida con tutti i comandi che puoi chiedere.', VoicePriority.HIGH);
           break;
         }
       }

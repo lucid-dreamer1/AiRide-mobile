@@ -663,7 +663,6 @@ import { SUPPORTED_LANGUAGES } from "@/types/voice";
 import { ttsService, getLanguageCode } from "@/services/TTSService";
 import { VoskModelManager, DownloadProgress } from "@/services/VoskModelManager";
 import { VoiceCommandsModal } from "@/components/VoiceCommandsModal";
-import { geminiVoiceService } from "@/services/GeminiVoiceService";
 
 type ModelState = 'checking' | 'bundled' | 'downloaded' | 'not_downloaded' | 'downloading';
 
@@ -672,56 +671,6 @@ const VoiceSettingsSection = () => {
   const [modelStates, setModelStates] = React.useState<Record<string, ModelState>>({});
   const [downloadProgress, setDownloadProgress] = React.useState<Record<string, number>>({});
   const [showCommandsModal, setShowCommandsModal] = React.useState(false);
-
-  // Google Gemini AI State
-  const [geminiKeyInput, setGeminiKeyInput] = React.useState('');
-  const [isGeminiActive, setIsGeminiActive] = React.useState(geminiVoiceService.isAvailable());
-  const [testPrompt, setTestPrompt] = React.useState('portami a fare benzina ma senza autostrada');
-  const [isTestingGemini, setIsTestingGemini] = React.useState(false);
-  const [geminiTestOutput, setGeminiTestOutput] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    (async () => {
-      const key = await geminiVoiceService.getApiKey();
-      if (key) {
-        setGeminiKeyInput(key);
-        setIsGeminiActive(true);
-      }
-    })();
-  }, []);
-
-  const handleSaveGeminiKey = async () => {
-    await geminiVoiceService.setApiKey(geminiKeyInput.trim());
-    const active = geminiVoiceService.isAvailable();
-    setIsGeminiActive(active);
-    Toast.show({
-      type: active ? 'success' : 'info',
-      text1: active ? '✨ Gemini AI Configurato!' : 'Chiave rimossa',
-      text2: active ? 'Comprensione contestuale e NLU attiva con Gemini 2.0 Flash' : 'Uso fallback regex locale',
-    });
-  };
-
-  const handleTestGemini = async () => {
-    if (!testPrompt.trim()) return;
-    setIsTestingGemini(true);
-    setGeminiTestOutput(null);
-    try {
-      const res = await geminiVoiceService.parseTextWithGemini(testPrompt);
-      if (res && res.intent) {
-        setGeminiTestOutput(
-          `Intent: ${res.intent.type}\n` +
-          `Dati: ${JSON.stringify(res.intent, null, 2)}` +
-          (res.spokenResponse ? `\nRisposta Vocale: "${res.spokenResponse}"` : '')
-        );
-      } else {
-        setGeminiTestOutput('Nessuna risposta o chiave non valida.');
-      }
-    } catch (e: any) {
-      setGeminiTestOutput(`Errore: ${e.message}`);
-    } finally {
-      setIsTestingGemini(false);
-    }
-  };
 
   // Controlla stato modelli all'avvio
   React.useEffect(() => {
@@ -821,140 +770,6 @@ const VoiceSettingsSection = () => {
         </View>
         <Feather name="chevron-right" size={20} color="#E85A2A" />
       </TouchableOpacity>
-
-      {/* SEZIONE GOOGLE GEMINI AI */}
-      <View
-        style={{
-          backgroundColor: '#151515',
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: isGeminiActive ? '#00D2FF44' : '#222',
-          padding: 14,
-          marginBottom: 16,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 10,
-                backgroundColor: isGeminiActive ? '#00D2FF22' : '#222',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Feather name="cpu" size={18} color={isGeminiActive ? '#00D2FF' : '#888'} />
-            </View>
-            <View>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Google Gemini 2.0 Flash</Text>
-              <Text style={{ color: '#888', fontSize: 12 }}>Comprensione contestuale & NLU</Text>
-            </View>
-          </View>
-          <View
-            style={{
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              borderRadius: 6,
-              backgroundColor: isGeminiActive ? '#10B98122' : '#ffffff11',
-            }}
-          >
-            <Text style={{ color: isGeminiActive ? '#10B981' : '#888', fontSize: 11, fontWeight: '700' }}>
-              {isGeminiActive ? 'ATTIVO' : 'DISATTIVO'}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={{ color: '#aaa', fontSize: 12, marginBottom: 10 }}>
-          Permette di comprendere frasi complesse, colloquiali e nomi complessi via Google AI Studio.
-        </Text>
-
-        {/* Input API Key */}
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-          <TextInput
-            style={{
-              flex: 1,
-              backgroundColor: '#0E0E0E',
-              borderWidth: 1,
-              borderColor: '#333',
-              borderRadius: 8,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              color: '#fff',
-              fontSize: 13,
-            }}
-            placeholder="Incolla API Key di Google AI Studio"
-            placeholderTextColor="#555"
-            value={geminiKeyInput}
-            onChangeText={setGeminiKeyInput}
-            secureTextEntry={true}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <TouchableOpacity
-            onPress={handleSaveGeminiKey}
-            style={{
-              backgroundColor: '#00D2FF',
-              borderRadius: 8,
-              paddingHorizontal: 14,
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ color: '#0B101B', fontWeight: '700', fontSize: 13 }}>Salva</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Box Test Rapido se la chiave è inserita */}
-        {isGeminiActive && (
-          <View style={{ backgroundColor: '#0B101B', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#1F2937' }}>
-            <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '600', marginBottom: 6 }}>
-              TEST RAPIDO COMPRENSIONE NLU:
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
-              <TextInput
-                style={{
-                  flex: 1,
-                  backgroundColor: '#1E293B',
-                  borderRadius: 6,
-                  paddingHorizontal: 10,
-                  paddingVertical: 6,
-                  color: '#fff',
-                  fontSize: 12,
-                }}
-                value={testPrompt}
-                onChangeText={setTestPrompt}
-                placeholder="Es. metti un po' di musica chill"
-                placeholderTextColor="#64748B"
-              />
-              <TouchableOpacity
-                onPress={handleTestGemini}
-                disabled={isTestingGemini}
-                style={{
-                  backgroundColor: '#3B82F6',
-                  borderRadius: 6,
-                  paddingHorizontal: 12,
-                  justifyContent: 'center',
-                }}
-              >
-                {isTestingGemini ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Testa AI</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {geminiTestOutput && (
-              <View style={{ backgroundColor: '#050B14', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#00D2FF33' }}>
-                <Text style={{ color: '#00D2FF', fontSize: 11, fontFamily: Platform.OS === 'android' ? 'monospace' : 'Courier' }}>
-                  {geminiTestOutput}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-      </View>
 
       {/* Lingua + Download Modello */}
       <Text style={styles.subSectionTitle}>Lingua & Modello Vocale</Text>

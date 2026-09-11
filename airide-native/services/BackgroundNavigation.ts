@@ -21,7 +21,6 @@ import auth from '@react-native-firebase/auth';
 import CallModule from './callModule';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { VoskModelManager } from './VoskModelManager';
-import { geminiVoiceService } from './GeminiVoiceService';
 
 const sleep = (time: number) => new Promise((resolve) => setTimeout(() => resolve(true), time));
 
@@ -261,13 +260,10 @@ const gpsOptions = {
 };
 
 // --- HELPERS ---
-const TTS_COOLDOWN_MS = 1200; // ms di silenzio dopo il TTS prima di riascoltare
+const TTS_COOLDOWN_MS = 900; // ms di silenzio dopo il TTS prima di riascoltare
 let ttsSafetyTimer: any = null;
 
 let lastTTSEndTime = 0;
-let isGeminiQuerying = false;
-let lastGeminiQueryText = '';
-let lastGeminiQueryTime = 0;
 
 const clearTTSFlag = (delay = TTS_COOLDOWN_MS) => {
     if (ttsSafetyTimer) clearTimeout(ttsSafetyTimer);
@@ -321,24 +317,18 @@ const speak = (text: string, langOverride?: string, onFinished?: () => void) => 
     });
 
     // Salva le parole chiave del testo appena detto per il filtro eco
-    lastSpokenWords = text.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    lastSpokenWords = text.toLowerCase().split(/\s+/).filter(w => w.length > 3);
 };
 
 // Parole pronunciate dal TTS nell'ultimo ciclo — usate per rilevare eco
 let lastSpokenWords: string[] = [];
 
 // Rimuove dal INIZIO della trascrizione le parole che coincidono con l'eco del TTS.
+// Es: "rotta verso roma confermi sì" → strip "rotta verso roma confermi" → rimane "sì"
 // Se non resta nulla (solo eco, nessun input utente) restituisce stringa vuota.
 const removeEchoPrefix = (text: string): string => {
     if (lastSpokenWords.length === 0) return text;
     const inputWords = text.toLowerCase().split(/\s+/);
-
-    // Controllo 1: Se la frase contiene parole chiave dell'ultimo TTS, è 100% eco degli altoparlanti
-    const matchingWords = inputWords.filter(w => w.length > 2 && lastSpokenWords.some(s => s.includes(w) || w.includes(s)));
-    if (matchingWords.length >= 2 || (inputWords.length <= 4 && matchingWords.length >= 1)) {
-        console.log(`[Background] 🔇 Intera frase scartata perché eco TTS: "${text}" (match: ${matchingWords.join(',')})`);
-        return '';
-    }
 
     let i = 0;
     while (i < inputWords.length) {
@@ -671,12 +661,6 @@ const handleIntent = (intent: VoiceIntent) => {
             }
             break;
         }
-
-        case 'GET_HELP': {
-            speak('Puoi chiedermi di impostare una rotta, trovare distributori o cibo, mettere la radio, parlare all\'interfono o consultare la velocità.');
-            DeviceEventEmitter.emit('Voice_Show_Commands');
-            break;
-        }
             
         default:
             // YES/NO in IDLE non hanno senso — li ignoriamo silenziosamente
@@ -713,14 +697,14 @@ const setupVosk = async () => {
                 }
             }
 
-            onResult(async (res) => {
+            onResult((res) => {
                 if (isOtaActive) return;
                 try {
                     const rawText = (typeof res === 'string' ? res : String(res)).toLowerCase().trim();
                     if (!rawText) return;
 
                     // Scarta l'input se il TTS sta ancora parlando (anti-echo) o è appena finito
-                    if (isTTSSpeaking || (Date.now() - lastTTSEndTime < TTS_COOLDOWN_MS)) {
+                    if (isTTSSpeaking || (Date.now() - lastTTSEndTime < 300)) {
                         console.log('[Background] 🔇 Vosk input ignorato (TTS in riproduzione o cooldown)');
                         return;
                     }
@@ -731,12 +715,6 @@ const setupVosk = async () => {
 
                     const { hasWakeWord, command } = intentParser.stripWakeWord(text);
                     const isWithinWindow = (Date.now() - lastWakeWordTime) < WAKE_WORD_WINDOW;
-
-                    // Se viene rilevata una nuova wake word, annulla qualsiasi query Gemini precedente
-                    if (hasWakeWord) {
-                        geminiVoiceService.cancelPendingQuery();
-                        isGeminiQuerying = false;
-                    }
 
                     // GESTIONE AI RESCUE (Priorità massima)
                     if (isEmergencyMode) {
@@ -774,43 +752,8 @@ const setupVosk = async () => {
                         if (cleanCmd.length > 0) {
                             console.log(`[VOSK RAW] 🔍 Testo comando: "${cleanCmd}"`);
                             const skipCheck = (sessionState !== 'IDLE') || isWithinWindow || hasWakeWord;
-                            let intent = intentParser.parse(cleanCmd, { skipWakeWordCheck: skipCheck });
-                            console.log(`[VOSK RAW] 🤖 Intent locale: ${intent.type}`);
-
-                            // Se l'intento locale è UNKNOWN e Gemini è disponibile, analizza con Gemini AI!
-                            if (intent.type === 'UNKNOWN' && geminiVoiceService.isAvailable()) {
-                                const now = Date.now();
-                                if (isGeminiQuerying) {
-                                    console.log('[Background] ⏳ Gemini già in elaborazione, ignoro evento duplicato.');
-                                    return;
-                                }
-                                if (cleanCmd === lastGeminiQueryText && (now - lastGeminiQueryTime < 3000)) {
-                                    console.log('[Background] 🔇 Query identica troppo recente, ignoro duplicato.');
-                                    return;
-                                }
-
-                                isGeminiQuerying = true;
-                                lastGeminiQueryText = cleanCmd;
-                                lastGeminiQueryTime = now;
-
-                                try {
-                                    console.log('[Background] 🧠 Intent locale non riconosciuto. Invoco Gemini AI...');
-                                    DeviceEventEmitter.emit('Voice_Status', { status: 'thinking' });
-                                    const navStore = NavigationStore.get();
-                                    const currentDest = (pendingIntent && 'destination' in pendingIntent) ? (pendingIntent as any).destination : null;
-                                    const geminiRes = await geminiVoiceService.parseTextWithGemini(cleanCmd, {
-                                        isNavigating: navStore.isNavigating,
-                                        destination: currentDest,
-                                    });
-
-                                    if (geminiRes?.intent && geminiRes.intent.type !== 'UNKNOWN') {
-                                        console.log(`[Background] 🌟 Gemini ha compreso l'intento: ${geminiRes.intent.type}`);
-                                        intent = geminiRes.intent;
-                                    }
-                                } finally {
-                                    isGeminiQuerying = false;
-                                }
-                            }
+                            const intent = intentParser.parse(cleanCmd, { skipWakeWordCheck: skipCheck });
+                            console.log(`[VOSK RAW] 🤖 Intent rilevato: ${intent.type}`);
 
                             if (intent.type !== 'UNKNOWN') {
                                 handleIntent(intent);
