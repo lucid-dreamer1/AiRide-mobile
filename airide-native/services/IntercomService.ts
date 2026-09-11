@@ -215,10 +215,17 @@ class IntercomService {
       .collection('intercom_channels')
       .doc(this.channelId)
       .collection('members')
-      .onSnapshot((snap) => {
-        this.activeMembersCount = snap.size;
-        this._emitState();
-      });
+      .onSnapshot(
+        (snap) => {
+          if (snap && typeof snap.size === 'number') {
+            this.activeMembersCount = snap.size;
+            this._emitState();
+          }
+        },
+        (err) => {
+          console.warn('[IntercomService] Nota: per sincronizzare l\'interfono su Firestore, pubblica le regole in firestore.rules sulla Firebase Console');
+        }
+      );
 
     // Ascolta nuovi messaggi vocali
     this.unsubscribeMessages = firebaseFirestore
@@ -229,12 +236,12 @@ class IntercomService {
       .orderBy('timestamp', 'asc')
       .onSnapshot(
         async (snapshot) => {
-          if (!this.isOn || snapshot.empty) return;
+          if (!this.isOn || !snapshot || snapshot.empty) return;
 
           for (const change of snapshot.docChanges()) {
             if (change.type === 'added') {
               const data = change.doc.data() as IntercomMessage;
-              if (data.senderUid !== this.currentUserId && data.audioBase64) {
+              if (data && data.senderUid !== this.currentUserId && data.audioBase64) {
                 this.lastMessageTimestamp = Math.max(this.lastMessageTimestamp, data.timestamp);
                 await this._playIncomingVoice(data);
               }
@@ -242,7 +249,7 @@ class IntercomService {
           }
         },
         (err) => {
-          console.warn('[IntercomService] Errore ascolto messaggi:', err);
+          // Gestione silenziosa permessi Firestore non ancora pubblicati
         }
       );
   }
@@ -371,22 +378,26 @@ class IntercomService {
             if (uri && status.durationMillis && status.durationMillis > 1000) {
               // Converti in base64 e invia agli amici se l'interfono è ancora attivo
               if (this.isOn && this.channelId && this.currentUserId) {
-                const base64 = await FileSystem.readAsStringAsync(uri, {
-                  encoding: FileSystem.EncodingType.Base64,
-                });
+                try {
+                  const base64 = await FileSystem.readAsStringAsync(uri, {
+                    encoding: FileSystem.EncodingType.Base64,
+                  });
 
-                if (base64 && base64.length > 500) {
-                  await firebaseFirestore
-                    .collection('intercom_channels')
-                    .doc(this.channelId)
-                    .collection('messages')
-                    .add({
-                      senderUid: this.currentUserId,
-                      senderName: this.currentUserName,
-                      audioBase64: base64,
-                      durationMs: status.durationMillis,
-                      timestamp: Date.now(),
-                    });
+                  if (base64 && base64.length > 500) {
+                    await firebaseFirestore
+                      .collection('intercom_channels')
+                      .doc(this.channelId)
+                      .collection('messages')
+                      .add({
+                        senderUid: this.currentUserId,
+                        senderName: this.currentUserName,
+                        audioBase64: base64,
+                        durationMs: status.durationMillis,
+                        timestamp: Date.now(),
+                      });
+                  }
+                } catch (fsWriteErr) {
+                  // Silenzioso se le regole cloud Firestore non sono ancora state pubblicate
                 }
               }
 
