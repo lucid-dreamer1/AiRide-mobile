@@ -186,13 +186,19 @@ export const FriendsRadarModal: React.FC<FriendsRadarModalProps> = ({
               </View>
               <View>
                 <Text style={styles.intercomBannerTitle}>
-                  {intercomState.isOn ? 'Interfono Attivo (Hands-Free)' : 'Interfono Spento'}
+                  {intercomState.isOn
+                    ? intercomState.targetFriendName
+                      ? `In linea con ${intercomState.targetFriendName}`
+                      : 'Interfono Gruppo (Hands-Free)'
+                    : 'Interfono Spento'}
                 </Text>
                 <Text style={styles.intercomBannerDesc}>
                   {intercomState.isOn
                     ? intercomState.currentSpeakerName
                       ? `Parla ${intercomState.currentSpeakerName}...`
-                      : `${intercomState.activeMembersCount} pilota/i connessi`
+                      : intercomState.targetFriendName
+                        ? 'Canale privato 1-a-1 attivo'
+                        : `${intercomState.activeMembersCount} pilota/i connessi`
                     : 'Dì "Ciao casco, accendi interfono" per attivarlo'}
                 </Text>
               </View>
@@ -206,7 +212,7 @@ export const FriendsRadarModal: React.FC<FriendsRadarModalProps> = ({
               onPress={handleToggleIntercom}
             >
               <Text style={styles.intercomToggleBtnText}>
-                {intercomState.isOn ? 'Spegni' : 'Accendi'}
+                {intercomState.isOn ? 'Spegni' : 'Gruppo'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -326,6 +332,43 @@ export const FriendsRadarModal: React.FC<FriendsRadarModalProps> = ({
 
                       {/* AZIONI RAPIDE */}
                       <View style={styles.actionsRow}>
+                        {/* Interfono 1-a-1 con questo amico */}
+                        <TouchableOpacity
+                          style={[
+                            styles.actionBtn,
+                            intercomState.isOn && intercomState.targetFriendUid === friend.uid
+                              ? { backgroundColor: '#10B981' }
+                              : { backgroundColor: 'rgba(255, 255, 255, 0.08)' },
+                          ]}
+                          onPress={async () => {
+                            if (intercomState.isOn && intercomState.targetFriendUid === friend.uid) {
+                              await intercomService.turnOff();
+                              Toast.show({ type: 'info', text1: '🔇 Interfono Spento' });
+                            } else {
+                              await intercomService.turnOnWithFriend(friend);
+                              Toast.show({
+                                type: 'success',
+                                text1: `🎙️ In linea con ${friend.displayName}`,
+                                text2: 'Canale 1-a-1 hands-free attivo',
+                              });
+                            }
+                          }}
+                        >
+                          <Feather
+                            name={
+                              intercomState.isOn && intercomState.targetFriendUid === friend.uid
+                                ? 'mic'
+                                : 'mic-off'
+                            }
+                            size={16}
+                            color={
+                              intercomState.isOn && intercomState.targetFriendUid === friend.uid
+                                ? '#FFFFFF'
+                                : '#94A3B8'
+                            }
+                          />
+                        </TouchableOpacity>
+
                         {/* Raggiungi compagno */}
                         {isVisibleOnMap && onNavigateToFriend && (
                           <TouchableOpacity
@@ -357,7 +400,8 @@ export const FriendsRadarModal: React.FC<FriendsRadarModalProps> = ({
                 <Feather name="mic" size={16} color={accentColor} />
                 <Text style={styles.hintText}>
                   Comandi vocali supportati:{'\n'}
-                  • <Text style={{ color: '#F1F5F9', fontWeight: 'bold' }}>"Ciao casco, accendi interfono"</Text>{'\n'}
+                  • <Text style={{ color: '#F1F5F9', fontWeight: 'bold' }}>"Ciao casco, interfono con [Nome]"</Text> (1-a-1){'\n'}
+                  • <Text style={{ color: '#F1F5F9', fontWeight: 'bold' }}>"Ciao casco, accendi interfono"</Text> (Gruppo){'\n'}
                   • <Text style={{ color: '#F1F5F9', fontWeight: 'bold' }}>"Ciao casco, raggiungi [Nome]"</Text>
                 </Text>
               </View>

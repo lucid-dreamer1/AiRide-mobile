@@ -29,6 +29,7 @@ export type VoiceIntent =
   | { type: 'RADIO_INFO' }
   | { type: 'INTERCOM_ON' }
   | { type: 'INTERCOM_OFF' }
+  | { type: 'INTERCOM_WITH_FRIEND'; friendName: string }
   | { type: 'INTERCOM_REPLAY' }
   | { type: 'INTERCOM_STATUS' }
   | { type: 'REACH_FRIEND'; friendName: string }
@@ -152,11 +153,12 @@ export class IntentParser {
   // ─────────────────────────────────────────
   // INTERFONO & RADAR COMPAGNI HANDS-FREE
   // ─────────────────────────────────────────
-  private intercomOnRegex     = /\b(accendi|attiva|apri|collega|connetti|avvia|start)\s+(il\s+|l['’])?interfono\b/i;
-  private intercomOffRegex    = /\b(spegni|spengi|stoppa|ferma|chiudi|disattiva|stacca|disconnetti|stop)\s+(il\s+|l['’])?interfono\b/i;
-  private intercomStatusRegex = /\b(chi\s+(c['’]è|è\s+connesso)|stato\s+interfono|amici\s+online|amici\s+in\s+linea)\b/i;
-  private intercomReplayRegex = /\b(ripeti\s+(l['’])?ultimo\s+messaggio|cosa\s+ha\s+detto|ripeti\s+interfono|ripeti\s+amico)\b/i;
-  private reachFriendRegex    = /\b(raggiungi|vai\s+da|porta\s+da|conducimi\s+da|trova|segui)\s+([a-zA-ZàèéìòùÀÈÉÌÒÙ]+)/i;
+  private intercomWithFriendRegex = /\b(?:interfono\s+con|parla\s+con|(?:accendi|attiva|apri|collega|connetti)\s+(?:il\s+|l['’])?interfono\s+con|chiama\s+interfono\s+a)\s+([a-zA-ZàèéìòùÀÈÉÌÒÙ]+)/i;
+  private intercomOnRegex         = /\b(accendi|attiva|apri|collega|connetti|avvia|start)\s+(il\s+|l['’])?interfono\b/i;
+  private intercomOffRegex        = /\b(spegni|spengi|stoppa|ferma|chiudi|disattiva|stacca|disconnetti|stop)\s+(il\s+|l['’])?interfono\b/i;
+  private intercomStatusRegex     = /\b(chi\s+(c['’]è|è\s+connesso)|stato\s+interfono|amici\s+online|amici\s+in\s+linea)\b/i;
+  private intercomReplayRegex     = /\b(ripeti\s+(l['’])?ultimo\s+messaggio|cosa\s+ha\s+detto|ripeti\s+interfono|ripeti\s+amico)\b/i;
+  private reachFriendRegex        = /\b(raggiungi|vai\s+da|porta\s+da|conducimi\s+da|trova|segui)\s+([a-zA-ZàèéìòùÀÈÉÌÒÙ]+)/i;
 
   // ─────────────────────────────────────────
   // WEB RADIO & STREAMING MUSICALE
@@ -359,6 +361,14 @@ export class IntentParser {
     }
 
     // 8. CONTROLLI INTERFONO HANDS-FREE & COMPAGNI
+    const intercomFriendMatch = cmd.match(this.intercomWithFriendRegex);
+    if (intercomFriendMatch && intercomFriendMatch[1]) {
+      const targetFriend = intercomFriendMatch[1].trim();
+      if (!this.homeRegex.test(targetFriend) && !this.workRegex.test(targetFriend) && !this.gasStationRegex.test(targetFriend) && !this.foodRegex.test(targetFriend)) {
+        return { type: 'INTERCOM_WITH_FRIEND', friendName: targetFriend };
+      }
+    }
+
     if (this.intercomOnRegex.test(cmd))     return { type: 'INTERCOM_ON' };
     if (this.intercomOffRegex.test(cmd))    return { type: 'INTERCOM_OFF' };
     if (this.intercomReplayRegex.test(cmd)) return { type: 'INTERCOM_REPLAY' };

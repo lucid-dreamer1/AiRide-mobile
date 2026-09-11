@@ -16,6 +16,8 @@ export interface IntercomState {
   isReceiving: boolean;
   currentSpeakerName: string | null;
   activeMembersCount: number;
+  targetFriendUid?: string | null;
+  targetFriendName?: string | null;
 }
 
 export interface IntercomMessage {
@@ -30,8 +32,11 @@ export interface IntercomMessage {
 class IntercomService {
   private isOn: boolean = false;
   private channelId: string | null = null;
+  private channelName: string = 'Canale Gruppo Amici';
   private currentUserId: string | null = null;
   private currentUserName: string = 'Pilota';
+  private targetFriendUid: string | null = null;
+  private targetFriendName: string | null = null;
   private isTransmitting: boolean = false;
   private isReceiving: boolean = false;
   private currentSpeakerName: string | null = null;
@@ -80,19 +85,52 @@ class IntercomService {
   }
 
   /**
-   * Accende l'interfono in modalità Hands-Free
+   * Genera l'ID canale deterministico per una chiamata 1-to-1 con un amico
    */
-  public async turnOn(targetChannelId?: string): Promise<boolean> {
-    if (this.isOn) {
-      console.log('[IntercomService] Interfono già attivo.');
+  public getDirectChannelId(friendUid: string): string {
+    if (!this.currentUserId) return `direct_${friendUid}`;
+    return [this.currentUserId, friendUid].sort().join('_');
+  }
+
+  /**
+   * Attiva l'interfono direttamente con un amico specifico (1-to-1)
+   */
+  public async turnOnWithFriend(friend: FriendProfile): Promise<boolean> {
+    if (this.isOn && this.targetFriendUid === friend.uid) {
+      console.log(`[IntercomService] Interfono già attivo con ${friend.displayName}`);
       return true;
+    }
+    if (this.isOn) {
+      await this.turnOff();
+    }
+    this.targetFriendUid = friend.uid;
+    this.targetFriendName = friend.displayName;
+    const directChannelId = this.getDirectChannelId(friend.uid);
+    return await this.turnOn(directChannelId, friend.displayName);
+  }
+
+  /**
+   * Accende l'interfono in modalità Hands-Free (di gruppo o 1-to-1)
+   */
+  public async turnOn(targetChannelId?: string, customChannelName?: string): Promise<boolean> {
+    if (this.isOn && this.channelId === targetChannelId) {
+      console.log('[IntercomService] Interfono già attivo su questo canale.');
+      return true;
+    }
+    if (this.isOn) {
+      await this.turnOff();
     }
 
     await this._ensureAudioConfig();
     this.isOn = true;
     this.channelId = targetChannelId || this._getDefaultChannelId();
-    this.lastMessageTimestamp = Date.now() - 5000; // Solo messaggi recenti da adesso in poi
-    console.log(`[IntercomService] 🎙️ Interfono ACCESO sul canale: ${this.channelId}`);
+    if (!targetChannelId) {
+      this.targetFriendUid = null;
+      this.targetFriendName = null;
+    }
+    this.channelName = customChannelName || (targetChannelId ? 'Interfono Diretto' : 'Canale Gruppo Amici');
+    this.lastMessageTimestamp = Date.now() - 5000;
+    console.log(`[IntercomService] 🎙️ Interfono ACCESO: ${this.channelName} (${this.channelId})`);
 
     // Registra la presenza nel canale Firestore
     await this._registerPresence(true);
@@ -118,6 +156,10 @@ class IntercomService {
     this.isTransmitting = false;
     this.isReceiving = false;
     this.currentSpeakerName = null;
+    this.targetFriendUid = null;
+    this.targetFriendName = null;
+    this.channelId = null;
+    this.channelName = 'Canale Gruppo Amici';
 
     // Ferma registrazione in corso
     await this._stopHandsFreeRecording();
@@ -453,11 +495,13 @@ class IntercomService {
     return {
       isOn: this.isOn,
       channelId: this.channelId,
-      channelName: 'Canale Amici',
+      channelName: this.channelName,
       isTransmitting: this.isTransmitting,
       isReceiving: this.isReceiving,
       currentSpeakerName: this.currentSpeakerName,
       activeMembersCount: this.activeMembersCount,
+      targetFriendUid: this.targetFriendUid,
+      targetFriendName: this.targetFriendName,
     };
   }
 

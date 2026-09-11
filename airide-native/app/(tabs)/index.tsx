@@ -1132,6 +1132,25 @@ export default function HomeScreen() {
           break;
         }
 
+        case 'INTERCOM_WITH_FRIEND': {
+          console.log('[HomeScreen] Eseguo INTERCOM_WITH_FRIEND:', intent.friendName);
+          const target = friendsService.findFriendByName(intent.friendName);
+          if (!target) {
+            ttsService.speak(`Non ho trovato nessun compagno di nome ${intent.friendName} nella tua lista amici.`, VoicePriority.HIGH);
+            break;
+          }
+          (async () => {
+            await intercomService.turnOnWithFriend(target);
+            Toast.show({
+              type: 'success',
+              text1: `🎙️ In linea con ${target.displayName}`,
+              text2: 'Canale 1-a-1 hands-free attivo',
+            });
+            ttsService.speak(`Interfono attivato con ${target.displayName}. Sei in linea diretta.`, VoicePriority.HIGH);
+          })();
+          break;
+        }
+
         case 'INTERCOM_OFF': {
           console.log('[HomeScreen] Eseguo INTERCOM_OFF');
           (async () => {

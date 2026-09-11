@@ -41,8 +41,13 @@ const COMMAND_CATEGORIES: CommandCategory[] = [
     items: [
       {
         command: '"Ciao casco, accendi interfono"',
-        description: 'Attiva la linea interfono vocale hands-free con i tuoi compagni di moto.',
+        description: 'Attiva la linea interfono vocale hands-free con tutti i tuoi compagni di moto (canale gruppo).',
         example: '"Hey casco, attiva interfono" o "Ciao casco, apri interfono"',
+      },
+      {
+        command: '"Ciao casco, interfono con [Nome Amico]"',
+        description: 'Attiva un canale interfono privato 1-a-1 direttamente con un amico specifico.',
+        example: '"Ciao casco, interfono con Marco" o "Hey casco, parla con Luca"',
       },
       {
         command: '"Ciao casco, spegni interfono"',
