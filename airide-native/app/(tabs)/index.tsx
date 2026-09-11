@@ -972,6 +972,11 @@ export default function HomeScreen() {
         case 'RADIO_STOP': {
           console.log('[HomeScreen] Eseguo RADIO_STOP');
           (async () => {
+            const st = radioService.getState();
+            if (!st.isPlaying) {
+              ttsService.speak("La radio è già spenta.", VoicePriority.HIGH);
+              return;
+            }
             await radioService.stop();
             Toast.show({
               type: 'info',
@@ -1022,7 +1027,12 @@ export default function HomeScreen() {
               text1: '🔊 Volume Radio',
               text2: `${pct}%`,
             });
-            ttsService.speak(`Volume radio ${pct} percento`, VoicePriority.HIGH);
+            const st = radioService.getState();
+            if (st.isPlaying) {
+              ttsService.speak(`Volume radio ${pct} percento`, VoicePriority.HIGH);
+            } else {
+              ttsService.speak(`Volume radio impostato al ${pct} percento.`, VoicePriority.HIGH);
+            }
           })();
           break;
         }

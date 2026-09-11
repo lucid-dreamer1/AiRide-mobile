@@ -147,41 +147,46 @@ export class IntentParser {
   // ─────────────────────────────────────────
   // WEB RADIO & STREAMING MUSICALE
   // ─────────────────────────────────────────
-  private radioStopRegex    = /\b(spegni|stoppa|ferma|chiudi|silenzia|disattiva|interrompi|stop|pause)\s*(la\s+)?(radio|musica)\b|\b(stop|ferma|stoppa)\s+(radio|musica)\b/i;
+  private radioStopRegex    = /\b(spegni|spengi|stoppa|ferma|chiudi|silenzia|disattiva|interrompi|togli|leva|basta|stop|pause)\b/i;
+  private radioVolDownRegex = /\b(abbassa|abassa|bassa|riduci|cala|meno\s+forte|più\s+piano|piu\s+piano)\b|\bvolume\s*(giù|giu|basso|meno)\b/i;
+  private radioVolUpRegex   = /\b(alza|aumenta|più\s+forte|piu\s+forte|forte)\b|\bvolume\s*(su|alto|più|piu)\b/i;
   private radioNextRegex    = /\b(prossima|cambia|successiva|avanti|altra)\s*(la\s+)?(stazione|radio|canzone|traccia)\b|\b(stazione|radio)\s+(successiva|dopo)\b|\bnext\s*(radio|station)?\b/i;
   private radioPrevRegex    = /\b(precedente|indietro|prima)\s*(la\s+)?(stazione|radio|canzone)\b|\b(stazione|radio)\s+(precedente|prima)\b|\bprev(ious)?\s*(radio|station)?\b/i;
-  private radioVolUpRegex   = /\b(alza\s+(il\s+)?volume(\s+della\s+radio)?|più\s+forte(\s+la\s+radio)?|volume\s+(su|alto))\b/i;
-  private radioVolDownRegex = /\b(abbassa\s+(il\s+)?volume(\s+della\s+radio)?|meno\s+forte(\s+la\s+radio)?|volume\s+(giù|giu|basso))\b/i;
   private radioInfoRegex    = /\b(che\s+(radio|stazione|canzone|brano)\s+(è|suona|sta\s+suonando)|cosa\s+sta\s+suonando|titolo\s+brano|info\s+radio)\b/i;
-  private radioPlayRegex    = /\b(metti|accendi|attiva|fai\s+partire|ascolta|fammi\s+sentire|riproduci|apri|sintonizza|collega|connetti|play|start)\s*(la\s+)?(radio|musica)?\b/i;
+  private radioPlayRegex    = /\b(metti|accendi|attiva|fai\s+partire|ascolta|fammi\s+sentire|riproduci|apri|sintonizza|collega|connetti|play|start)\b/i;
 
   private radioStationsList = [
-    { id: 'ibiza_global', name: 'Ibiza Global Radio', aliases: ['ibiza global', 'ibiza global radio', 'ibiza', 'ibiza radio', 'musica elettronica', 'elettronica'] },
-    { id: 'ibiza_sonica', name: 'Ibiza Sonica', aliases: ['ibiza sonica', 'sonica'] },
-    { id: 'deejay', name: 'Radio Deejay', aliases: ['radio deejay', 'deejay', 'dj', 'dijey', 'dejay'] },
-    { id: 'r105', name: 'Radio 105', aliases: ['radio 105', '105', 'centocinque', 'radio centocinque'] },
-    { id: 'virgin', name: 'Virgin Radio', aliases: ['virgin radio', 'virgin', 'rock', 'radio rock'] },
-    { id: 'rtl1025', name: 'RTL 102.5', aliases: ['rtl 1025', 'rtl 102.5', 'rtl', 'centodue e cinque', 'radio rtl'] },
-    { id: 'rds', name: 'RDS', aliases: ['rds', 'radio dimensione suono'] },
-    { id: 'm2o', name: 'm2o', aliases: ['m2o', 'emme due o', 'dance'] },
-    { id: 'radio24', name: 'Radio 24', aliases: ['radio 24', 'radio24', 'ventiquattro', 'sole 24 ore'] },
-    { id: 'capital', name: 'Radio Capital', aliases: ['radio capital', 'capital'] },
+    { id: 'ibiza_global', name: 'Ibiza Global Radio', distinctKeywords: ['ibiza', 'global'] },
+    { id: 'ibiza_sonica', name: 'Ibiza Sonica', distinctKeywords: ['sonica'] },
+    { id: 'deejay', name: 'Radio Deejay', distinctKeywords: ['deejay', 'dj', 'dijey', 'dejay'] },
+    { id: 'r105', name: 'Radio 105', distinctKeywords: ['105', 'centocinque'] },
+    { id: 'virgin', name: 'Virgin Radio', distinctKeywords: ['virgin', 'rock'] },
+    { id: 'rtl1025', name: 'RTL 102.5', distinctKeywords: ['rtl', '102.5', '1025', 'centodue'] },
+    { id: 'rds', name: 'RDS', distinctKeywords: ['rds', 'dimensione suono'] },
+    { id: 'm2o', name: 'm2o', distinctKeywords: ['m2o', 'emmedueo'] },
+    { id: 'radio24', name: 'Radio 24', distinctKeywords: ['24', 'ventiquattro', 'sole 24'] },
+    { id: 'capital', name: 'Radio Capital', distinctKeywords: ['capital'] },
   ];
+
+  private static readonly RADIO_GENERIC_WORDS = new Set(['radio', 'musica', 'canzone', 'brano', 'stazione', 'volume', 'suono', 'la', 'il', 'della', 'dello']);
 
   private matchRadioStation(cmd: string): string | null {
     const clean = cmd.toLowerCase();
+    // 1. Match diretto su keyword distintive con word boundary
     for (const station of this.radioStationsList) {
-      for (const alias of station.aliases) {
-        if (clean.includes(alias)) {
+      for (const kw of station.distinctKeywords) {
+        const escaped = kw.replace('.', '\\.');
+        const reg = new RegExp(`(^|\\s|\\b)${escaped}(\\s|\\b|$)`, 'i');
+        if (reg.test(clean)) {
           return station.name;
         }
       }
     }
-    // Fuzzy search per i token con parole singole
-    const tokens = clean.split(/\s+/);
+    // 2. Fuzzy match solo su token non generici e lunghi almeno 3 lettere
+    const tokens = clean.split(/\s+/).filter(t => !IntentParser.RADIO_GENERIC_WORDS.has(t) && t.length >= 3);
     for (const station of this.radioStationsList) {
-      for (const alias of station.aliases) {
-        if (alias.indexOf(' ') === -1 && tokens.some(t => matchesFuzzy(t, [alias]))) {
+      for (const kw of station.distinctKeywords) {
+        if (kw.indexOf(' ') === -1 && tokens.some(t => matchesFuzzy(t, [kw]))) {
           return station.name;
         }
       }
@@ -340,18 +345,34 @@ export class IntentParser {
     }
 
     // 8. CONTROLLI RADIO & STREAMING MUSICALE
-    if (this.radioStopRegex.test(cmd)) return { type: 'RADIO_STOP' };
+    const isRadioContext = /\b(radio|stazione|musica|brano|canzone)\b/i.test(cmd);
+
+    // STOP HA PRECEDENZA ASSOLUTA: non deve MAI avviare la radio!
+    if (this.radioStopRegex.test(cmd) && (isRadioContext || /\b(tutto|audio)\b/i.test(cmd))) {
+      return { type: 'RADIO_STOP' };
+    }
+
+    // VOLUME (abbassa / alza volume o radio)
+    if (this.radioVolDownRegex.test(cmd) && (isRadioContext || /\bvolume\b/i.test(cmd))) {
+      return { type: 'RADIO_VOLUME', level: 'down' };
+    }
+    if (this.radioVolUpRegex.test(cmd) && (isRadioContext || /\bvolume\b/i.test(cmd))) {
+      return { type: 'RADIO_VOLUME', level: 'up' };
+    }
+
+    // NEXT / PREV / INFO
     if (this.radioNextRegex.test(cmd)) return { type: 'RADIO_NEXT' };
     if (this.radioPrevRegex.test(cmd)) return { type: 'RADIO_PREV' };
-    if (this.radioVolUpRegex.test(cmd)) return { type: 'RADIO_VOLUME', level: 'up' };
-    if (this.radioVolDownRegex.test(cmd)) return { type: 'RADIO_VOLUME', level: 'down' };
     if (this.radioInfoRegex.test(cmd)) return { type: 'RADIO_INFO' };
 
+    // PLAY STAZIONE SPECIFICA (es: "metti ibiza", "metti deejay", "radio 24")
     const stationFound = this.matchRadioStation(cmd);
     if (stationFound) {
       return { type: 'RADIO_PLAY', station: stationFound };
     }
-    if (this.radioPlayRegex.test(cmd) && /\b(radio|musica)\b/i.test(cmd)) {
+
+    // PLAY GENERICO (es: "metti la radio", "accendi la musica")
+    if (this.radioPlayRegex.test(cmd) && isRadioContext) {
       return { type: 'RADIO_PLAY' };
     }
 
