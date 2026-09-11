@@ -261,7 +261,7 @@ const gpsOptions = {
 };
 
 // --- HELPERS ---
-const TTS_COOLDOWN_MS = 900; // ms di silenzio dopo il TTS prima di riascoltare
+const TTS_COOLDOWN_MS = 1200; // ms di silenzio dopo il TTS prima di riascoltare
 let ttsSafetyTimer: any = null;
 
 let lastTTSEndTime = 0;
@@ -321,18 +321,24 @@ const speak = (text: string, langOverride?: string, onFinished?: () => void) => 
     });
 
     // Salva le parole chiave del testo appena detto per il filtro eco
-    lastSpokenWords = text.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    lastSpokenWords = text.toLowerCase().split(/\s+/).filter(w => w.length > 2);
 };
 
 // Parole pronunciate dal TTS nell'ultimo ciclo — usate per rilevare eco
 let lastSpokenWords: string[] = [];
 
 // Rimuove dal INIZIO della trascrizione le parole che coincidono con l'eco del TTS.
-// Es: "rotta verso roma confermi sì" → strip "rotta verso roma confermi" → rimane "sì"
 // Se non resta nulla (solo eco, nessun input utente) restituisce stringa vuota.
 const removeEchoPrefix = (text: string): string => {
     if (lastSpokenWords.length === 0) return text;
     const inputWords = text.toLowerCase().split(/\s+/);
+
+    // Controllo 1: Se la frase contiene parole chiave dell'ultimo TTS, è 100% eco degli altoparlanti
+    const matchingWords = inputWords.filter(w => w.length > 2 && lastSpokenWords.some(s => s.includes(w) || w.includes(s)));
+    if (matchingWords.length >= 2 || (inputWords.length <= 4 && matchingWords.length >= 1)) {
+        console.log(`[Background] 🔇 Intera frase scartata perché eco TTS: "${text}" (match: ${matchingWords.join(',')})`);
+        return '';
+    }
 
     let i = 0;
     while (i < inputWords.length) {
@@ -714,7 +720,7 @@ const setupVosk = async () => {
                     if (!rawText) return;
 
                     // Scarta l'input se il TTS sta ancora parlando (anti-echo) o è appena finito
-                    if (isTTSSpeaking || (Date.now() - lastTTSEndTime < 300)) {
+                    if (isTTSSpeaking || (Date.now() - lastTTSEndTime < TTS_COOLDOWN_MS)) {
                         console.log('[Background] 🔇 Vosk input ignorato (TTS in riproduzione o cooldown)');
                         return;
                     }
@@ -725,6 +731,12 @@ const setupVosk = async () => {
 
                     const { hasWakeWord, command } = intentParser.stripWakeWord(text);
                     const isWithinWindow = (Date.now() - lastWakeWordTime) < WAKE_WORD_WINDOW;
+
+                    // Se viene rilevata una nuova wake word, annulla qualsiasi query Gemini precedente
+                    if (hasWakeWord) {
+                        geminiVoiceService.cancelPendingQuery();
+                        isGeminiQuerying = false;
+                    }
 
                     // GESTIONE AI RESCUE (Priorità massima)
                     if (isEmergencyMode) {

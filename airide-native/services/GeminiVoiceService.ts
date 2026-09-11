@@ -7,12 +7,7 @@ import { ParsedIntent } from '../utils/IntentParser';
 const STORAGE_GEMINI_KEY = '@airide_gemini_api_key';
 const GEMINI_MODELS = [
   'gemini-3.5-flash-lite',
-  'gemini-flash-latest',
-  'gemini-3.6-flash',
-  'gemini-3.5-flash',
   'gemini-flash-lite-latest',
-  'gemini-2.5-flash-lite',
-  'gemini-2.5-flash',
 ];
 
 export interface GeminiIntentResult {
@@ -246,10 +241,24 @@ FORMATO RISPOSTA (SOLO JSON, NIENTE TESTO EXTRA, NIENTE BACKTICKS MARKDOWN):
 
   private workingModel: string | null = null;
 
+  private activeAbortController: AbortController | null = null;
+
+  public cancelPendingQuery(): void {
+    if (this.activeAbortController) {
+      console.log('[GeminiVoiceService] 🛑 Annullamento richiesta Gemini precedente');
+      try {
+        this.activeAbortController.abort();
+      } catch (_) {}
+      this.activeAbortController = null;
+    }
+  }
+
   /**
    * Esegue la chiamata HTTP REST verso Google Gemini
    */
   private async _callGeminiAPI(payload: any, key: string): Promise<GeminiIntentResult | null> {
+    this.cancelPendingQuery();
+
     // Se abbiamo già un modello funzionante per questa chiave, provalo per primo
     const modelsToTry = this.workingModel
       ? [this.workingModel, ...GEMINI_MODELS.filter(m => m !== this.workingModel)]
@@ -261,7 +270,8 @@ FORMATO RISPOSTA (SOLO JSON, NIENTE TESTO EXTRA, NIENTE BACKTICKS MARKDOWN):
 
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 10000);
+        this.activeAbortController = controller;
+        const timer = setTimeout(() => controller.abort(), 6000);
 
         const response = await fetch(url, {
           method: 'POST',
@@ -270,6 +280,7 @@ FORMATO RISPOSTA (SOLO JSON, NIENTE TESTO EXTRA, NIENTE BACKTICKS MARKDOWN):
           signal: controller.signal,
         });
         clearTimeout(timer);
+        this.activeAbortController = null;
 
         const elapsed = Date.now() - startTime;
 
