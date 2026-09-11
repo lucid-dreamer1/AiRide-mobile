@@ -308,113 +308,49 @@ export default function HomeScreen() {
       try {
           console.log("📝 Richiedendo permessi runtime...");
           
-          // 1. Runtime Permissions
-          const permissionsToRequest = [
-              PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-              PermissionsAndroid.PERMISSIONS.CALL_PHONE,
-              PermissionsAndroid.PERMISSIONS.ANSWER_PHONE_CALLS,
-              PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
-              PermissionsAndroid.PERMISSIONS.READ_CONTACTS,
+          const isAndroid12 = Platform.Version >= 31;
+          const isAndroid13 = Platform.Version >= 33;
+
+          // 1. Runtime Permissions adatte alla versione Android in uso
+          const permissionsToRequest: any[] = [
               PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
               PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+              PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
           ];
 
-          if (Platform.Version >= 31) {
+          if (isAndroid12) {
               permissionsToRequest.push(
                   PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
                   PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT
               );
           }
 
-          const result = await PermissionsAndroid.requestMultiple(permissionsToRequest);
-          
-          // Controllo negati
-          const deniedPermissions = Object.entries(result)
-              .filter(([key, value]) => value !== PermissionsAndroid.RESULTS.GRANTED)
-              .map(([key, value]) => key.split('.').pop());
-
-          if (deniedPermissions.length > 0) {
-              console.log("📝 Denied: ", deniedPermissions); 
-               Alert.alert(
-                  "Permessi Necessari",
-                  `Hai negato permessi essenziali:\n${deniedPermissions.join(', ')}\n\nL'app non può funzionare correttamente. Vai nelle Impostazioni e abilitali.`,
-                  [
-                      { text: "Chiudi", style: "cancel" },
-                      { text: "Impostazioni", onPress: () => Linking.openSettings() }
-                  ]
+          if (isAndroid13) {
+              permissionsToRequest.push(
+                  PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
               );
-              return false; 
           }
 
-          // 2. Battery Optimization
-          const isBatteryOptimized = await Linking.canOpenURL("android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS");
-          // Nota: canOpenURL controlla solo se l'intent è valido, non se è già ottimizzato. 
-          // Android non ha un'API pubblica semplice per checkare "isIgnoringBatteryOptimizations" da JS senza Native Module custom.
-          // Tuttavia, per ora lasciamo l'alert ma potremmo usare un flag in AsyncStorage "batteryAlertShown" per non mostrarlo sempre?
-          // OPPURE: Rimuoviamo il timeout e lo mostriamo solo se l'utente lo richiede esplicitamente o se notiamo problemi.
-          // PER IL MOMENTO: Lo commentiamo/rimuoviamo se è troppo invasivo, o lo lasciamo. 
-          // L'utente dice "a volte appaiono quando non devono". 
-          // Se l'utente ha già dato l'ok, Android di solito ignora la richiesta o mostra "già ottimizzato".
-          
-          // MIGLIORAMENTO: Mostriamo l'alert solo se è la prima volta o se non salvato
-          // Per semplicità e stabilità richiesta: Rimuoviamo il timeout aggressivo. Spostiamolo in un "Check Status" manuale o solo prima installazione.
-          // MA, per rispettare la richiesta "non devono apparire se non devono":
-          // Purtroppo senza Native Module "PowerManager.isIgnoringBatteryOptimizations" non possiamo saperlo con certezza da JS puro.
-          // SOLUZIONE COMPROMESSO: Usiamo il flag "hasLaunched" (o simile) per mostrarlo UNA volta sola.
-          // O meglio: Lo rimuoviamo dal flusso automatico di avvio per evitare spam, e lo lasciamo nelle impostazioni?
-          // L'utente vuole risolvere il bug "appaiono quando non devono".
-          // Se appaiono, vuol dire che il codice viene eseguito.
-          
-          // PROPOSTA: Rimuovo questi alert automatici dal flusso di avvio (loop o timeout) e li lascio solo su richiesta utente o check più intelligente.
-          // STEP: Rendo il timeout condizionale o lo rimuovo. L'utente ha detto "a volte appaiono".
-          // Facciamo che se PermissionsAndroid dice tutto OK, non rompiamo le scatole con Battery/Overlay a meno che non sia vitale.
-          
-          // DECISIONE: Commento i timeout per Battery e Overlay nel flusso automatico. 
-          // Se l'app non va in background, l'utente andrà nelle impostazioni o resetterà.
-          // Questo risolve "appaiono quando non devono" (cioè sempre).
-          
-          /* 
-          setTimeout(() => {
-             // ... Code removed to stop spam
-          }, 500);
-          */
+          // Permessi opzionali per gestione chiamate vivavoce
+          permissionsToRequest.push(
+              PermissionsAndroid.PERMISSIONS.CALL_PHONE,
+              PermissionsAndroid.PERMISSIONS.ANSWER_PHONE_CALLS,
+              PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
+              PermissionsAndroid.PERMISSIONS.READ_CONTACTS
+          );
 
-          // 3. Overlay 
-          if (Platform.Version >= 29) {
-             const canOverlay = await PermissionsAndroid.check("android.permission.SYSTEM_ALERT_WINDOW" as any); 
-             // Attenzione: SYSTEM_ALERT_WINDOW non si checka con PermissionsAndroid standard su tutti i device, ma proviamo.
-             // Se ritorna false (o non supportato), e Settings.canDrawOverlays è true... 
-             // In realtà Settings.canDrawOverlays richiede Native Module.
-             
-             // PER RISOLVERE IL BUG "appaiono quando non devono": Li rimuovo dall'auto-check all'avvio. 
-             // Li sposterò eventualmente in un pulsante "Diagnostica" o se l'utente attiva la navigazione Background.
-             
-             /*
-               setTimeout(() => {
-                  Alert.alert(
-                      "Visualizzazione sopra app",
-                      "Necessario per vedere le indicazioni mentre usi altre app.",
-                      [
-                           { text: "Ignora", style: "cancel" },
-                           {
-                              text: "Impostazioni Overlay",
-                              onPress: () => {
-                                  Linking.sendIntent("android.settings.action.MANAGE_OVERLAY_PERMISSION", [
-                                      { key: "package", value: "package:com.anonymous.airidenative" }
-                                  ]).catch(() => Linking.openSettings());
-                              }
-                           }
-                      ]
-                  );
-               }, 3000); 
-             */
-          }
+          // Timeout di sicurezza di 5s: se l'OS o l'utente non risponde subito, non blocchiamo l'app
+          await Promise.race([
+              PermissionsAndroid.requestMultiple(permissionsToRequest),
+              new Promise<Record<string, string>>((resolve) => setTimeout(() => resolve({}), 5000))
+          ]);
           
+          console.log("📝 Permessi runtime verificati.");
           return true;
 
       } catch (err) {
           console.warn("Permission parsing error:", err);
-          return false;
+          return true;
       }
   };
 
@@ -427,19 +363,31 @@ export default function HomeScreen() {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") return;
 
-        const pos = await Location.getCurrentPositionAsync({});
-        const p = {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        };
+        // Prova prima la posizione rapida in cache (istantanea)
+        let pos = await Location.getLastKnownPositionAsync({});
+        if (!pos) {
+          pos = await Promise.race([
+            Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000))
+          ]) as any;
+        }
 
-        setCurrentPosition(p);
-        NavigationStore.set({ currentCoords: p });
-        mapRef.current?.animateCamera(
-          { center: p, zoom: 16 },
-          { duration: 500 }
-        );
-      } catch {}
+        if (pos?.coords) {
+          const p = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          };
+
+          setCurrentPosition(p);
+          NavigationStore.set({ currentCoords: p });
+          mapRef.current?.animateCamera(
+            { center: p, zoom: 16 },
+            { duration: 500 }
+          );
+        }
+      } catch (err) {
+        console.warn("GPS Init error:", err);
+      }
     })();
 
     // -------------------------------------------------------------
@@ -470,12 +418,18 @@ export default function HomeScreen() {
       setIsNavigating(false); // Reset navigazione se ricalcolo
 
       const dest = overrideDest ?? destination;
-      const pos = await Location.getCurrentPositionAsync({});
+      let pos = await Location.getLastKnownPositionAsync({});
+      if (!pos) {
+        pos = await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+        ]) as any;
+      }
 
-      const start = {
+      const start = pos?.coords ? {
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,
-      };
+      } : (currentPosition || { latitude: 41.9028, longitude: 12.4964 });
 
       setCurrentPosition(start);
 

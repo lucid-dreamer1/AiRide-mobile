@@ -1136,8 +1136,7 @@ export const BackgroundNavigation = {
                 if (isAndroid12) {
                     const hasBleConnect = granted[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT] === PermissionsAndroid.RESULTS.GRANTED;
                     if (!hasBleConnect) {
-                        console.warn("[Manager] 🛑 START ABORTED: Missing BLUETOOTH_CONNECT permission!");
-                        return;
+                        console.warn("[Manager] ⚠️ Missing BLUETOOTH_CONNECT permission (Bluetooth SCO will not be enabled, phone mic/speaker will be used)");
                     }
                 }
                 
