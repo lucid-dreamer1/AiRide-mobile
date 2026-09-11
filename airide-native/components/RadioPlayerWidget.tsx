@@ -18,10 +18,12 @@ import { radioService, RadioState, RADIO_STATIONS, RadioStation } from '@/servic
 
 interface RadioPlayerWidgetProps {
   accentColor?: string;
+  onClose?: () => void;
 }
 
 export const RadioPlayerWidget: React.FC<RadioPlayerWidgetProps> = ({
   accentColor = '#00D2FF',
+  onClose,
 }) => {
   const [radioState, setRadioState] = useState<RadioState>(radioService.getState());
   const [showStationModal, setShowStationModal] = useState(false);
@@ -159,7 +161,7 @@ export const RadioPlayerWidget: React.FC<RadioPlayerWidgetProps> = ({
             onPress={() => radioService.togglePlay()}
             disabled={radioState.isLoading}
           >
-            {radioState.isLoading || radioState.isBuffering ? (
+            {(radioState.isLoading || radioState.isBuffering) && !radioState.isPlaying ? (
               <ActivityIndicator size="small" color="#0B101B" />
             ) : (
               <Ionicons
@@ -188,6 +190,17 @@ export const RadioPlayerWidget: React.FC<RadioPlayerWidgetProps> = ({
           >
             <Feather name="list" size={18} color="#94A3B8" />
           </TouchableOpacity>
+
+          {/* Chiudi / Riduci Widget (se aperto via FAB) */}
+          {onClose && (
+            <TouchableOpacity
+              style={styles.closeWidgetButton}
+              onPress={onClose}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Feather name="chevron-down" size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -381,6 +394,12 @@ const styles = StyleSheet.create({
   listButton: {
     padding: 6,
     marginLeft: 2,
+  },
+  closeWidgetButton: {
+    padding: 6,
+    marginLeft: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 10,
   },
   modalOverlay: {
     flex: 1,

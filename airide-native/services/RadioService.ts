@@ -273,6 +273,7 @@ class RadioService {
       // Ferma e dealloca il suono precedente
       if (this.sound) {
         try {
+          this.sound.setOnPlaybackStatusUpdate(null);
           await this.sound.stopAsync();
           await this.sound.unloadAsync();
         } catch (_) {}
@@ -324,19 +325,28 @@ class RadioService {
         console.error(`[RadioService] Errore playback stream: ${status.error}`);
         this.isPlaying = false;
         this.isBuffering = false;
+        this.isLoading = false;
         this.lastError = status.error;
         this._emitState();
       }
       return;
     }
 
+    const prevPlaying = this.isPlaying;
+    const prevBuffering = this.isBuffering;
+
     this.isPlaying = status.isPlaying;
     this.isBuffering = status.isBuffering;
+    if (status.isPlaying) {
+      this.isLoading = false;
+    }
 
     // Se per qualche motivo lo stream live finisce (es. timeout o disconnessione rete), prova a riconnettere
     if (status.didJustFinish) {
       console.log('[RadioService] Stream interrotto, tentativo riconnessione...');
       this.play(this.currentStation || undefined);
+    } else if (prevPlaying !== this.isPlaying || prevBuffering !== this.isBuffering) {
+      this._emitState();
     }
   };
 
@@ -344,12 +354,9 @@ class RadioService {
    * Ferma/pausa la radio
    */
   public async stop(): Promise<void> {
-    this.isPlaying = false;
-    this.isBuffering = false;
-    this.isLoading = false;
-
     if (this.sound) {
       try {
+        this.sound.setOnPlaybackStatusUpdate(null);
         await this.sound.stopAsync();
         await this.sound.unloadAsync();
       } catch (e) {
@@ -357,6 +364,11 @@ class RadioService {
       }
       this.sound = null;
     }
+
+    this.isPlaying = false;
+    this.isBuffering = false;
+    this.isLoading = false;
+    this.lastError = null;
 
     this._emitState();
     console.log('[RadioService] ⏹️ Radio fermata');
@@ -366,6 +378,7 @@ class RadioService {
    * Alterna play / pausa
    */
   public async togglePlay(): Promise<boolean> {
+    if (this.isLoading) return this.isPlaying;
     if (this.isPlaying) {
       await this.stop();
       return false;

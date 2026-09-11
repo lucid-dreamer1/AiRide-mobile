@@ -662,6 +662,7 @@ import { useVoiceSettings } from "@/contexts/VoiceSettingsContext";
 import { SUPPORTED_LANGUAGES } from "@/types/voice";
 import { ttsService, getLanguageCode } from "@/services/TTSService";
 import { VoskModelManager, DownloadProgress } from "@/services/VoskModelManager";
+import { VoiceCommandsModal } from "@/components/VoiceCommandsModal";
 
 type ModelState = 'checking' | 'bundled' | 'downloaded' | 'not_downloaded' | 'downloading';
 
@@ -669,6 +670,7 @@ const VoiceSettingsSection = () => {
   const { settings, updateSettings } = useVoiceSettings();
   const [modelStates, setModelStates] = React.useState<Record<string, ModelState>>({});
   const [downloadProgress, setDownloadProgress] = React.useState<Record<string, number>>({});
+  const [showCommandsModal, setShowCommandsModal] = React.useState(false);
 
   // Controlla stato modelli all'avvio
   React.useEffect(() => {
@@ -730,6 +732,44 @@ const VoiceSettingsSection = () => {
         value={settings.enabled}
         onChange={(v) => updateSettings({ enabled: v })}
       />
+
+      {/* Guida Comandi Vocali */}
+      <TouchableOpacity
+        onPress={() => setShowCommandsModal(true)}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: 'rgba(232, 90, 42, 0.08)',
+          borderRadius: 14,
+          padding: 14,
+          borderWidth: 1,
+          borderColor: 'rgba(232, 90, 42, 0.25)',
+          marginBottom: 16,
+          gap: 12,
+        }}
+      >
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            backgroundColor: '#E85A2A',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Feather name="mic" size={20} color="white" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>
+            Tutti i Comandi Vocali
+          </Text>
+          <Text style={{ color: '#888', fontSize: 12, marginTop: 2 }}>
+            Consulta la guida su cosa puoi chiedere a "Hey Casco"
+          </Text>
+        </View>
+        <Feather name="chevron-right" size={20} color="#E85A2A" />
+      </TouchableOpacity>
 
       {/* Lingua + Download Modello */}
       <Text style={styles.subSectionTitle}>Lingua & Modello Vocale</Text>
@@ -825,6 +865,12 @@ const VoiceSettingsSection = () => {
         <Feather name="volume-2" size={18} color="white" />
         <Text style={styles.testButtonText}>Prova Voce</Text>
       </TouchableOpacity>
+
+      <VoiceCommandsModal
+        visible={showCommandsModal}
+        onClose={() => setShowCommandsModal(false)}
+        accentColor="#E85A2A"
+      />
     </View>
   );
 };

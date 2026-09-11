@@ -50,8 +50,9 @@ import * as Contacts from 'expo-contacts';
 import { NavigationStore } from "@/services/NavigationStore"; // <--- Import Store
 import { ttsService } from "@/services/TTSService";
 import { VoicePriority } from "@/types/voice";
-import { radioService } from "@/services/RadioService";
+import { radioService, RadioState } from "@/services/RadioService";
 import { RadioPlayerWidget } from "@/components/RadioPlayerWidget";
+import { VoiceCommandsModal } from "@/components/VoiceCommandsModal";
 
 const DEMO_MODE = true;
 
@@ -111,6 +112,9 @@ export default function HomeScreen() {
   const [demoSpeed, setDemoSpeed] = useState(3);
   const [showDemoPanel, setShowDemoPanel] = useState(false);
   const [showBlePanel, setShowBlePanel] = useState(false);
+  const [showRadioPanel, setShowRadioPanel] = useState(false);
+  const [showVoiceHelp, setShowVoiceHelp] = useState(false);
+  const [radioState, setRadioState] = useState<RadioState>(radioService.getState());
   
   const [showOnboarding, setShowOnboarding] = useState(false); // <--- New State
 
@@ -128,6 +132,18 @@ export default function HomeScreen() {
   const mapRef = useRef<MapView | null>(null);
 
   const hasLoadedFromRides = useRef(false);
+
+  // -------------------------------------------------------------
+  // RADIO STATE LISTENER
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('Radio_StateChanged', (state: RadioState) => {
+      setRadioState({ ...state });
+    });
+    return () => {
+      sub.remove();
+    };
+  }, []);
 
   // -------------------------------------------------------------
   // ONBOARDING CHECK
@@ -953,6 +969,7 @@ export default function HomeScreen() {
         // 📻 WEB RADIO & STREAMING
         case 'RADIO_PLAY': {
           console.log('[HomeScreen] Eseguo RADIO_PLAY:', intent.station);
+          setShowRadioPanel(true);
           (async () => {
             const station = await radioService.play(intent.station);
             if (station) {
@@ -990,6 +1007,7 @@ export default function HomeScreen() {
 
         case 'RADIO_NEXT': {
           console.log('[HomeScreen] Eseguo RADIO_NEXT');
+          setShowRadioPanel(true);
           (async () => {
             const nextStation = await radioService.next();
             Toast.show({
@@ -1004,6 +1022,7 @@ export default function HomeScreen() {
 
         case 'RADIO_PREV': {
           console.log('[HomeScreen] Eseguo RADIO_PREV');
+          setShowRadioPanel(true);
           (async () => {
             const prevStation = await radioService.prev();
             Toast.show({
@@ -1103,6 +1122,24 @@ export default function HomeScreen() {
   });
 
   // -------------------------------------------------------------
+  // RADIO PANEL ANIMATION
+  // -------------------------------------------------------------
+  const radioPanelAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(radioPanelAnim, {
+      toValue: showRadioPanel ? 1 : 0,
+      useNativeDriver: true,
+      tension: 65,
+      friction: 9,
+    }).start();
+  }, [showRadioPanel]);
+
+  const radioPanelTranslate = radioPanelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [30, 0],
+  });
+
+  // -------------------------------------------------------------
   // UI
   // -------------------------------------------------------------
   return (
@@ -1163,12 +1200,46 @@ export default function HomeScreen() {
       </View>
 
 
+      {/* 🔹 COMANDI VOCALI / GUIDA ASSISTENTE FAB */}
+      <TouchableOpacity
+        onPress={() => setShowVoiceHelp(true)}
+        style={styles.helpFab}
+      >
+        <Feather name="help-circle" size={22} color={themeColors.accent} />
+      </TouchableOpacity>
+
       {/* 🔹 BLE FAB (SEMPRE VISIBILE) */}
       <TouchableOpacity
         onPress={() => setShowBlePanel(!showBlePanel)}
         style={[styles.bleFab, { backgroundColor: connected ? "#1DB954" : themeColors.card, borderWidth: 2, borderColor: connected ? "#1DB954" : themeColors.accent }]}
       >
         <Feather name="bluetooth" size={22} color={connected ? "white" : themeColors.accent} />
+      </TouchableOpacity>
+
+      {/* 🔹 RADIO FAB (SEMPRE VISIBILE, SI ESTENDE AL TAP) */}
+      <TouchableOpacity
+        onPress={() => setShowRadioPanel(!showRadioPanel)}
+        style={[
+          styles.radioFab,
+          {
+            backgroundColor: radioState.isPlaying
+              ? (radioState.currentStation?.color || themeColors.accent)
+              : (showRadioPanel ? "rgba(0, 210, 255, 0.2)" : themeColors.card),
+            borderWidth: 2,
+            borderColor: radioState.isPlaying
+              ? (radioState.currentStation?.color || themeColors.accent)
+              : (showRadioPanel ? themeColors.accent : "rgba(255, 255, 255, 0.15)"),
+          },
+        ]}
+      >
+        <Feather
+          name="radio"
+          size={22}
+          color={radioState.isPlaying ? "#0B101B" : (showRadioPanel ? themeColors.accent : themeColors.text)}
+        />
+        {radioState.isPlaying && (
+          <View style={styles.radioFabLiveDot} />
+        )}
       </TouchableOpacity>
 
       {/* 🔹 BLE PANEL */}
@@ -1316,10 +1387,24 @@ export default function HomeScreen() {
         <InstructionCard instruction={currentInstruction} />
       )}
 
-      {/* 📻 WEB RADIO MINI-PLAYER */}
-      <View style={[styles.radioWidgetWrapper, { bottom: isNavigating ? 220 : 126 }]}>
-        <RadioPlayerWidget accentColor={themeColors.accent} />
-      </View>
+      {/* 📻 WEB RADIO MINI-PLAYER (ESTESO SOLO SE SELEZIONATO) */}
+      {showRadioPanel && (
+        <Animated.View
+          style={[
+            styles.radioWidgetWrapper,
+            {
+              bottom: isNavigating ? 220 : 126,
+              opacity: radioPanelAnim,
+              transform: [{ translateY: radioPanelTranslate }],
+            },
+          ]}
+        >
+          <RadioPlayerWidget
+            accentColor={themeColors.accent}
+            onClose={() => setShowRadioPanel(false)}
+          />
+        </Animated.View>
+      )}
 
       {/* SEND BUTTON */}
       <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
@@ -1328,6 +1413,13 @@ export default function HomeScreen() {
       </TouchableOpacity>
 
       <OnboardingModal visible={showOnboarding} onDone={handleOnboardingDone} />
+
+      {/* MODAL GUIDA COMANDI VOCALI */}
+      <VoiceCommandsModal
+        visible={showVoiceHelp}
+        onClose={() => setShowVoiceHelp(false)}
+        accentColor={themeColors.accent}
+      />
 
     </View>
   );
@@ -1432,6 +1524,21 @@ const createStyles = (colors: any) =>
       elevation: 10,
     },
 
+    helpFab: {
+      position: "absolute",
+      top: 135,
+      left: 82,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: colors.card,
+      borderWidth: 2,
+      borderColor: colors.accent,
+      justifyContent: "center",
+      alignItems: "center",
+      elevation: 8,
+    },
+
     bleFab: {
       position: "absolute",
       top: 135,
@@ -1443,6 +1550,30 @@ const createStyles = (colors: any) =>
       justifyContent: "center",
       alignItems: "center",
       elevation: 8,
+    },
+
+    radioFab: {
+      position: "absolute",
+      top: 135,
+      right: 82,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      justifyContent: "center",
+      alignItems: "center",
+      elevation: 8,
+    },
+
+    radioFabLiveDot: {
+      position: "absolute",
+      top: 9,
+      right: 9,
+      width: 9,
+      height: 9,
+      borderRadius: 4.5,
+      backgroundColor: "#EF4444",
+      borderWidth: 1.5,
+      borderColor: "#0B101B",
     },
 
     blePanel: {
@@ -1461,7 +1592,7 @@ const createStyles = (colors: any) =>
     resetFab: {
       position: "absolute",
       top: 135,
-      right: 85, // A sinistra del Bluetooth FAB
+      right: 144, // A sinistra del Radio FAB
       width: 52,
       height: 52,
       borderRadius: 26,
