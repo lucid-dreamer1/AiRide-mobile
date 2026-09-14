@@ -7,7 +7,20 @@
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import requests, json, math, time, traceback
+import os, requests, json, math, time, traceback
+
+# Caricamento automatico file .env locale (se presente, per sviluppo locale)
+_env_path = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(_env_path):
+    try:
+        with open(_env_path, "r") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    os.environ.setdefault(_k.strip(), _v.strip())
+    except Exception:
+        pass
 
 ###############################################################
 # FLASK APP
@@ -23,7 +36,7 @@ current_positions = {}
 DEMO_USER_ID = "demo"
 
 # TomTom API
-API_KEY = "XeNHiK6pLDHE2MYxOyW5bOmv01ZN73oy"
+API_KEY = os.environ.get("TOMTOM_API_KEY", "")
 
 ###############################################################
 # UTILITY

@@ -94,7 +94,7 @@ export async function sendEmergencyCall(userId: string, lat: number, lon: number
 // ======================================================
 // 📌 RICERCA POI MOTO (Benzinai, Cibo, Officine) — TomTom Search API
 // ======================================================
-const TOMTOM_API_KEY = "XeNHiK6pLDHE2MYxOyW5bOmv01ZN73oy";
+const TOMTOM_API_KEY = process.env.EXPO_PUBLIC_TOMTOM_API_KEY || "";
 
 export interface NearbyPoiItem {
   name: string;
