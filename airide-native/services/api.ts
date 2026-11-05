@@ -1,16 +1,81 @@
 import EventSource from "react-native-sse";
 
-const BASE_URL = "https://airide-backend.onrender.com";
+// ======================================================
+// 🌐 SERVER + FAILOVER
+// ======================================================
+// Primario: server personale (veloce, nessun cold start)
+// Backup:   Render (può avere cold start fino a ~60s)
+const PRIMARY_URL = "https://api.airideint.com";
+const FALLBACK_URL = "https://airide-backend.onrender.com";
+
+const PRIMARY_TIMEOUT_MS = 5000;     // se il primario non risponde entro 5s → backup
+const FALLBACK_TIMEOUT_MS = 60000;   // Render può impiegare molto al cold start
+const PRIMARY_COOLDOWN_MS = 60000;   // dopo un fallimento, salta il primario per 60s
+
+let primaryDownUntil = 0;
+
+// Status HTTP che indicano "server irraggiungibile" (proxy/Cloudflare/gateway)
+function isServerDownStatus(status: number) {
+  return status === 502 || status === 503 || status === 504 || (status >= 520 && status <= 530);
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Esegue la richiesta sul primario e, se è down (errore rete, timeout, 502/503/504/52x),
+ * passa automaticamente al server Render. Ritorna anche quale server ha risposto.
+ */
+async function apiFetch(
+  path: string,
+  init: RequestInit = {},
+  opts: { primaryTimeoutMs?: number; fallbackTimeoutMs?: number } = {}
+): Promise<{ res: Response; base: string }> {
+  const primaryTimeout = opts.primaryTimeoutMs ?? PRIMARY_TIMEOUT_MS;
+  const fallbackTimeout = opts.fallbackTimeoutMs ?? FALLBACK_TIMEOUT_MS;
+
+  if (Date.now() >= primaryDownUntil) {
+    try {
+      const res = await fetchWithTimeout(`${PRIMARY_URL}${path}`, init, primaryTimeout);
+      if (!isServerDownStatus(res.status)) {
+        if (primaryDownUntil !== 0) console.log("[API] ✅ Server primario di nuovo online");
+        primaryDownUntil = 0;
+        return { res, base: PRIMARY_URL };
+      }
+      console.warn(`[API] ⚠️ Primario ha risposto ${res.status} su ${path} → passo a Render`);
+    } catch (err) {
+      console.warn(`[API] ⚠️ Primario irraggiungibile su ${path} → passo a Render`, err);
+    }
+    primaryDownUntil = Date.now() + PRIMARY_COOLDOWN_MS;
+  }
+
+  const res = await fetchWithTimeout(`${FALLBACK_URL}${path}`, init, fallbackTimeout);
+  return { res, base: FALLBACK_URL };
+}
+
+/** Server attualmente preferito (utile per debug/UI). */
+export function getActiveServer() {
+  return Date.now() >= primaryDownUntil ? PRIMARY_URL : FALLBACK_URL;
+}
+
+// Ultimo viaggio avviato: serve a ricreare la sessione se si cambia server
+// (le sessioni del backend sono in memoria e non condivise tra server).
+let lastTrip: { body: string; base: string } | null = null;
 
 // ======================================================
 // 📌 PRENDI IL PERCORSO
 // ======================================================
 export async function getRoute(lat: number, lon: number, destination: string) {
-  const url = `${BASE_URL}/route_info?start=${lat},${lon}&end=${encodeURIComponent(
-    destination
-  )}`;
+  const path = `/route_info?start=${lat},${lon}&end=${encodeURIComponent(destination)}`;
 
-  const res = await fetch(url);
+  const { res } = await apiFetch(path);
   if (!res.ok) throw new Error("Errore server getRoute");
 
   return await res.json();
@@ -21,36 +86,71 @@ export async function getRoute(lat: number, lon: number, destination: string) {
 // 📌 START TRIP (Inizializza sessione backend)
 // ======================================================
 export async function startTrip(start: { lat: number; lon: number }, end: string) {
-  const url = `${BASE_URL}/start_trip`;
+  const body = JSON.stringify({
+    start: `${start.lat},${start.lon}`,
+    end: end,
+  });
 
   try {
-    const res = await fetch(url, {
+    const { res, base } = await apiFetch("/start_trip", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        start: `${start.lat},${start.lon}`,
-        end: end,
-      }),
+      body,
     });
-    return await res.json();
+    const data = await res.json();
+    if (res.ok) lastTrip = { body, base };
+    return data;
   } catch (err) {
     console.log("startTrip failed:", err);
     throw err;
   }
 }
 
+// Ricrea la sessione di viaggio sul server indicato
+async function replayTripOn(base: string) {
+  if (!lastTrip) return false;
+  try {
+    console.log(`[API] 🔁 Ricreo la sessione di viaggio su ${base}`);
+    const res = await fetchWithTimeout(
+      `${base}/start_trip`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: lastTrip.body },
+      base === PRIMARY_URL ? PRIMARY_TIMEOUT_MS * 2 : FALLBACK_TIMEOUT_MS
+    );
+    if (res.ok) {
+      lastTrip = { ...lastTrip, base };
+      return true;
+    }
+  } catch (err) {
+    console.warn("[API] Replay sessione fallito:", err);
+  }
+  return false;
+}
+
 // ======================================================
 // 📌 INVIA POSIZIONE AL SERVER (POST — ritorna navigazione)
 // ======================================================
 export async function updatePosition(lat: number, lon: number) {
-  const url = `${BASE_URL}/update_position`;
+  const init: RequestInit = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ lat, lon }),
+  };
 
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lat, lon }),
-    });
+    const { res, base } = await apiFetch("/update_position", init);
+
+    // Il server che ha risposto non ha la sessione del viaggio → ricreala e ripeti
+    if (lastTrip && lastTrip.base !== base) {
+      if (await replayTripOn(base)) {
+        const retry = await fetchWithTimeout(
+          `${base}/update_position`,
+          init,
+          base === PRIMARY_URL ? PRIMARY_TIMEOUT_MS : FALLBACK_TIMEOUT_MS
+        );
+        return await retry.json();
+      }
+    }
+
     return await res.json();
   } catch (err) {
     console.log("updatePosition failed:", err);
@@ -62,14 +162,17 @@ export async function updatePosition(lat: number, lon: number) {
 // 📌 EMERGENZA (AiRescue)
 // ======================================================
 export async function sendEmergencyCall(userId: string, lat: number, lon: number, contactPhone: string) {
-  const url = `${BASE_URL}/emergency_call`;
-  
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: userId, lat, lon, contact_phone: contactPhone }),
-    });
+    // Timeout primario più largo: è una chiamata critica e non va duplicata inutilmente
+    const { res } = await apiFetch(
+      "/emergency_call",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, lat, lon, contact_phone: contactPhone }),
+      },
+      { primaryTimeoutMs: 10000, fallbackTimeoutMs: 90000 }
+    );
 
     if (!res.ok) {
       console.log(`sendEmergencyCall failed with status ${res.status}`);
@@ -195,8 +298,8 @@ export async function searchNearbyPoi(
 
   // 2. Fallback su Backend se la chiamata diretta non è andata a buon fine
   try {
-    const backendUrl = `${BASE_URL}/search_nearby_poi?lat=${lat}&lon=${lon}&category=${encodeURIComponent(category)}`;
-    const res = await fetch(backendUrl);
+    const path = `/search_nearby_poi?lat=${lat}&lon=${lon}&category=${encodeURIComponent(category)}`;
+    const { res } = await apiFetch(path);
     if (res.ok) {
       return await res.json();
     }

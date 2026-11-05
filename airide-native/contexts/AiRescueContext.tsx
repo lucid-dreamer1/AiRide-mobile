@@ -30,6 +30,8 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
 
   const countdownTimer = useRef<NodeJS.Timeout | null>(null);
   const sttListener = useRef<any>(null);
+  // Ref (non stato) per evitare closure obsolete nei listener e doppi invii
+  const sendingRef = useRef(false);
 
   // Fetch settings from Firebase
   useEffect(() => {
@@ -81,6 +83,7 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
   }, [enabled, isCrashDetected]);
 
   const handleCrash = () => {
+    sendingRef.current = false;
     setIsCrashDetected(true);
     setCountdown(30);
     setIsSending(false);
@@ -107,22 +110,28 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
     // Timeout di sicurezza massimo (6 secondi) in caso di blocco del TTS
     setTimeout(activateSTT, 6000);
 
-    // Start countdown
+    // Start countdown (l'updater deve restare PURO: niente side effect qui dentro)
+    if (countdownTimer.current) clearInterval(countdownTimer.current);
     countdownTimer.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(countdownTimer.current as NodeJS.Timeout);
-          setIsSending(true);
-          sendEmergencyMessage();
-          return 0;
-        }
-        return prev - 1;
-      });
+      setCountdown((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
   };
 
+  // Quando il countdown arriva a 0 → invio emergenza (fuori dal render)
+  useEffect(() => {
+    if (!isCrashDetected || countdown !== 0 || sendingRef.current) return;
+
+    if (countdownTimer.current) {
+      clearInterval(countdownTimer.current);
+      countdownTimer.current = null;
+    }
+    sendingRef.current = true;
+    setIsSending(true);
+    sendEmergencyMessage();
+  }, [countdown, isCrashDetected]);
+
   const handleCancel = () => {
-    if (isSending) return; // Se ha già mandato il messaggio, ignora il click ritardato
+    if (sendingRef.current) return; // Se ha già mandato il messaggio, ignora il click ritardato
     
     if (countdownTimer.current) {
       clearInterval(countdownTimer.current);
@@ -199,6 +208,7 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
       console.error("Emergency message failed", e);
       Alert.alert("Errore", "Impossibile inviare il messaggio di emergenza. Controlla la connessione.");
     } finally {
+      sendingRef.current = false;
       setIsCrashDetected(false);
       setIsSending(false);
     }
