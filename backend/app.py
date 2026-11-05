@@ -155,13 +155,32 @@ def extract_instructions(resp_json):
 
 
 def manovra_to_freccia(text):
+    """
+    Codici direzione HUD (App + Casco OLED):
+      0 = Svolta a destra (→)
+      1 = Svolta a sinistra (←)
+      2 = Prosegui dritto (↑)
+      3 = Inversione a U (↶)
+      4 = Arrivo a destinazione (🏁)
+      5 = Mantieni la destra / Bivio DX (↗)
+      6 = Mantieni la sinistra / Bivio SX (↖)
+      7 = Rotonda / Rotatoria (⟳)
+    """
     t = (text or "").lower()
+    if any(k in t for k in ["arriv", "destinazione", "completato", "you have reached"]):
+        return 4
+    if any(k in t for k in ["rotonda", "rotatoria", "roundabout"]):
+        return 7
+    if any(k in t for k in ["u-turn", "inversione"]):
+        return 3
+    if any(k in t for k in ["mantieni la destra", "keep right", "bear right", "slight right", "leggermente a destra", "uscita a destra"]):
+        return 5
+    if any(k in t for k in ["mantieni la sinistra", "keep left", "bear left", "slight left", "leggermente a sinistra", "uscita a sinistra"]):
+        return 6
     if "right" in t or "destra" in t:
         return 0
     if "left" in t or "sinistra" in t:
         return 1
-    if "u-turn" in t or "inversione" in t:
-        return 3
     return 2
 
 
@@ -243,11 +262,27 @@ def compute_navigation_payload(user_id: str):
             session["polyline"] = new_poly
 
     # finito
+    total_dist = int(session.get("total_dist", 0))
     if idx >= len(instructions):
-        return {"testo": "Percorso completato 🎉", "fase": "complete", "metri": 0, "freccia": 2, "next": None}
+        return {
+            "testo": "Percorso completato 🎉",
+            "fase": "complete",
+            "metri": 0,
+            "freccia": 4,
+            "total_dist": total_dist,
+            "remaining_dist": 0,
+            "next": None,
+        }
 
     instr = instructions[idx]
     d = distanza_m(pos["lat"], pos["lon"], instr["lat"], instr["lon"])
+
+    # Calcolo distanza rimanente approssimata fino a fine rotta
+    rem_dist = d
+    for j in range(idx, len(instructions) - 1):
+        c1, c2 = instructions[j], instructions[j + 1]
+        if c1.get("lat") is not None and c2.get("lat") is not None:
+            rem_dist += distanza_m(c1["lat"], c1["lon"], c2["lat"], c2["lon"])
 
     if d > 120:
         fase = "preview"
@@ -265,6 +300,8 @@ def compute_navigation_payload(user_id: str):
         "metri": int(d),
         "freccia": manovra_to_freccia(instr["text_it"]),
         "fase": fase,
+        "total_dist": max(total_dist, int(rem_dist)),
+        "remaining_dist": int(rem_dist),
         "next": {
             "testo": next_instr["text_it"],
             "freccia": manovra_to_freccia(next_instr["text_it"]),
@@ -357,10 +394,14 @@ def start_trip():
             for p in leg.get("points", []):
                 polyline.append({"lat": p["latitude"], "lon": p["longitude"]})
 
+        summary = route_data["routes"][0].get("summary", {})
+        total_dist_m = int(summary.get("lengthInMeters", 0))
+
         active_sessions[user_id] = {
             "end_coords": end_coords,
             "instructions": instructions,
             "polyline": polyline,
+            "total_dist": total_dist_m,
             "idx": 0,
             "recalc_needed": False,
             "started_at": time.time(),

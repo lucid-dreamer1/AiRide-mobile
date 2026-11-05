@@ -2,6 +2,9 @@ import { useEffect } from "react";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import auth from "@react-native-firebase/auth";
+import { BackgroundNavigation } from "../../services/BackgroundNavigation";
+import { intercomService } from "../../services/IntercomService";
+import { radioService } from "../../services/RadioService";
 
 export default function LogoutScreen() {
   const router = useRouter();
@@ -17,6 +20,9 @@ export default function LogoutScreen() {
           style: "destructive",
           onPress: async () => {
             try {
+              await intercomService.turnOff().catch(() => {});
+              await radioService.stop().catch(() => {});
+              await BackgroundNavigation.stop().catch(() => {});
               await auth().signOut();
               router.replace("/login");
             } catch (err) {

@@ -7,6 +7,7 @@ import { DeviceEventEmitter } from 'react-native';
 import { firebaseFirestore } from './firebaseConfig';
 import { radioService } from './RadioService';
 import { friendsService, FriendProfile } from './FriendsService';
+import { bleService } from './BleSingleton';
 
 export interface IntercomState {
   isOn: boolean;
@@ -305,6 +306,8 @@ class IntercomService {
       this.isReceiving = true;
       this.currentSpeakerName = msg.senderName;
       this._emitState();
+      const safeSpeaker = String(msg.senderName || 'Amico').replace(/[|:]/g, '').slice(0, 12);
+      bleService.sendHudCommand(`INT:${safeSpeaker}`).catch(() => {});
 
       console.log(`[IntercomService] 🔊 Ricevuto audio da ${msg.senderName} (${msg.durationMs}ms)`);
 
@@ -332,6 +335,7 @@ class IntercomService {
           this.isReceiving = false;
           this.currentSpeakerName = null;
           this._emitState();
+          bleService.sendHudCommand('INT:0').catch(() => {});
 
           // Ripristina volume radio
           setTimeout(() => {

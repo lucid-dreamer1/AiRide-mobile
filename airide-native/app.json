@@ -42,7 +42,8 @@
         "WAKE_LOCK",
         "ACCESS_BACKGROUND_LOCATION",
         "SEND_SMS",
-        "READ_CONTACTS"
+        "READ_CONTACTS",
+        "READ_CALL_LOG"
       ],
       "config": {
         "googleMaps": {
@@ -78,7 +79,8 @@
                 "name": "service",
                 "attributes": {
                   "android:name": "com.asterinet.react.bgactions.RNBackgroundActionsTask",
-                  "android:foregroundServiceType": "location|microphone"
+                  "android:foregroundServiceType": "location|microphone",
+                  "android:stopWithTask": "true"
                 }
               }
             ]

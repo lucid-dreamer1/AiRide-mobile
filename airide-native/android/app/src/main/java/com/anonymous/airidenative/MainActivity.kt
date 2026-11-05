@@ -62,4 +62,17 @@ class MainActivity : ReactActivity() {
       // because it's doing more than [Activity.moveTaskToBack] in fact.
       super.invokeDefaultOnBackPressed()
   }
+
+  override fun onDestroy() {
+    try {
+      val serviceIntent = android.content.Intent(
+        applicationContext,
+        com.asterinet.react.bgactions.RNBackgroundActionsTask::class.java
+      )
+      applicationContext.stopService(serviceIntent)
+      val notificationManager = getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+      notificationManager?.cancel(com.asterinet.react.bgactions.RNBackgroundActionsTask.SERVICE_NOTIFICATION_ID)
+    } catch (_: Exception) {}
+    super.onDestroy()
+  }
 }

@@ -232,8 +232,8 @@ let activePoiList: NearbyPoiItem[] = [];
 let currentPoiIndex = 0;
 
 const options = {
-    taskName: 'AirRideNav',
-    taskTitle: 'AirRide è attivo',
+    taskName: 'AiRideNav',
+    taskTitle: 'AiRide è attivo',
     taskDesc: 'Navigazione smart in corso',
     taskIcon: {
         name: 'ic_launcher',
@@ -355,6 +355,9 @@ const resetSession = () => {
     if (sessionTimeout) clearTimeout(sessionTimeout);
     sessionTimeout = null;
     DeviceEventEmitter.emit('Voice_Status', { status: 'idle' });
+    if (!isOtaActive && bleService.getDevice()) {
+        bleService.sendHudCommand('MIC:0').catch(() => {});
+    }
 };
 
 const startSessionTimeout = () => {
@@ -448,6 +451,9 @@ const checkWakeWord = (text: string) => {
             const dimmi = CONFIRM_MSGS[voiceSettings.language]?.dimmi || 'Dimmi';
             speak(dimmi);
             DeviceEventEmitter.emit('Voice_Status', { status: 'listening' });
+            if (!isOtaActive && bleService.getDevice()) {
+                bleService.sendHudCommand('MIC:1').catch(() => {});
+            }
         }
         return true;
     }
@@ -741,6 +747,9 @@ const setupVosk = async () => {
                                 const dimmi = CONFIRM_MSGS[voiceSettings.language]?.dimmi || 'Dimmi';
                                 speak(dimmi);
                                 DeviceEventEmitter.emit('Voice_Status', { status: 'listening' });
+                                if (!isOtaActive && bleService.getDevice()) {
+                                    bleService.sendHudCommand('MIC:1').catch(() => {});
+                                }
                             }
                         }
                         return;
@@ -762,6 +771,9 @@ const setupVosk = async () => {
                                 if (sessionState === 'IDLE') {
                                     isCommandWindowOpen = false;
                                     DeviceEventEmitter.emit('Voice_Status', { status: 'idle' });
+                                    if (!isOtaActive && bleService.getDevice()) {
+                                        bleService.sendHudCommand('MIC:0').catch(() => {});
+                                    }
                                 }
                             }
                         }
@@ -770,6 +782,9 @@ const setupVosk = async () => {
                     if (sessionState === 'IDLE' && isCommandWindowOpen && !isWithinWindow && !hasWakeWord) {
                         isCommandWindowOpen = false;
                         DeviceEventEmitter.emit('Voice_Status', { status: 'idle' });
+                        if (!isOtaActive && bleService.getDevice()) {
+                            bleService.sendHudCommand('MIC:0').catch(() => {});
+                        }
                     }
 
                 } catch (e) {
@@ -1075,13 +1090,11 @@ const navigationTask = async (taskDataArguments: any) => {
                     const currentData = NavigationStore.get();
                     
                     // Calcolo dati navigazione
-                    const total = currentData.totalDist ?? 0;
-                    const remaining = currentData.remainingDist ?? 0;
+                    const total = Math.round(currentData.totalDist ?? 0);
+                    const remaining = Math.round(currentData.remainingDist ?? 0);
                     
-                    // Protocollo: freccia|metri turno|m totali|m mancanti
-                    // Modifica: Rimosso callStatus perché l'Arduino supporta max 4 campi. Se inviamo il 5° (callStatus), 
-                    // la funzione safeParseLong di Arduino concatena i numeri sballando la distanza rimanente!
-                    const packet = `${currentData.arrow}|${currentData.distance}|${total}|${remaining}`; 
+                    // Protocollo base 4 campi (retrocompatibile): freccia|metri turno|m totali|m mancanti
+                    const packet = `${currentData.arrow}|${Math.round(currentData.distance ?? 0)}|${total}|${remaining}`; 
 
                     console.log(`[Background] 🟢 BRAIN LOOP | Packet: ${packet}`);
     
@@ -1089,6 +1102,10 @@ const navigationTask = async (taskDataArguments: any) => {
                     if (!isOtaActive && bleService.getDevice()) {
                          try {
                              await bleService.sendToHelmet(packet);
+                             // Invia metadati estesi HUD (prossima freccia + velocità) ignorati dai vecchi firmware
+                             const nextDir = currentData.nextArrow !== undefined && currentData.nextArrow !== null ? currentData.nextArrow : -1;
+                             const spdKmh = Math.round(currentData.currentSpeedKmh ?? 0);
+                             await bleService.sendHudCommand(`NXT:${nextDir}:${spdKmh}`);
                          } catch (bleErr) {
                              console.warn('[Background] Errore invio pacchetto BLE:', bleErr);
                          }
@@ -1168,6 +1185,11 @@ export const BackgroundNavigation = {
                      console.log("[Manager] 📞 Call Event:", event);
                      if (event && typeof event.status === 'number') {
                          NavigationStore.set({ callStatus: event.status });
+                         if (!isOtaActive && bleService.getDevice()) {
+                             const rawCaller = String(event.callerName || event.data || '').replace(/[|:]/g, '').trim();
+                             const caller = rawCaller.slice(0, 18);
+                             bleService.sendHudCommand(`CALL:${event.status}:${caller}`).catch(() => {});
+                         }
                      }
                 });
 

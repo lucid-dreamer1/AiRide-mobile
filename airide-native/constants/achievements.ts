@@ -37,7 +37,7 @@ export const REWARDS: Record<
     description: "Visualizza più info sul casco nelle tratte supportate.",
   },
   "pro-mode": {
-    label: "AirRide Pro Mode",
+    label: "AiRide Pro Mode",
     description: "Modalità avanzata con layout dedicati al riding intenso.",
   },
   "theme-premium": {

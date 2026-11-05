@@ -100,7 +100,7 @@ export default function HomeScreen() {
   } = useNavigationContext();
 
   // 👇 FIX: usiamo scanAndConnect (quello del tuo HelmetContext)
-  const { connected, error, scanAndConnect } = useHelmet();
+  const { connected, error, scanAndConnect, sendToHelmet } = useHelmet();
 
   // Voice Assistant
   const { settings: voiceSettings } = useVoiceSettings();
@@ -331,12 +331,13 @@ export default function HomeScreen() {
               );
           }
 
-          // Permessi opzionali per gestione chiamate vivavoce
+          // Permessi opzionali per gestione chiamate vivavoce + caller ID rubrica
           permissionsToRequest.push(
               PermissionsAndroid.PERMISSIONS.CALL_PHONE,
               PermissionsAndroid.PERMISSIONS.ANSWER_PHONE_CALLS,
               PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
-              PermissionsAndroid.PERMISSIONS.READ_CONTACTS
+              PermissionsAndroid.PERMISSIONS.READ_CONTACTS,
+              PermissionsAndroid.PERMISSIONS.READ_CALL_LOG
           );
 
           // Timeout di sicurezza di 5s: se l'OS o l'utente non risponde subito, non blocchiamo l'app
@@ -708,6 +709,9 @@ export default function HomeScreen() {
         destination
       );
 
+      // Resetta il blocco distanza totale sul casco per la nuova rotta
+      sendToHelmet("$RST").catch(() => {});
+
       // 🔥 AVVIA LA NAVIGATION LOOP REALE (Anche in Demo Mode per testare BG)
       if (DEMO_MODE) NavigationStore.set({ isDemo: true });
       setIsNavigating(true);
@@ -725,6 +729,7 @@ export default function HomeScreen() {
     setImmersiveMode(false); // <--- DISATTIVA IMMERSIVE MODE
     setIsNavigating(false);
     NavigationStore.set({ isDemo: false }); // Reset Demo Flag
+    sendToHelmet("$IDLE").catch(() => {});
     setDemoCanStart(false);
     setRouteCoords([]);
     setCurrentInstruction(null);
@@ -744,16 +749,44 @@ export default function HomeScreen() {
   };
 
   const [callStatus, setCallStatus] = useState<number>(0); 
-  // 0: Nessuna, 1: In arrivo, 2: Attiva, 3: Conclusa
+  const [callerDisplay, setCallerDisplay] = useState<string>("");
+  const callCleanupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 0: Nessuna, 1: In arrivo, 2: Attiva, 3: Conclusa/Rifiutata, 4: In uscita, 5: Persa
 
   useEffect(() => {
     const sub = CallModule.addStatusListener((event: any) => {
         console.log("📞 STATUS CHANGED:", event);
-        setCallStatus(event.status);
-        if (event.status === 3) setTimeout(() => setCallStatus(0), 3000); 
+        if (callCleanupTimerRef.current) {
+          clearTimeout(callCleanupTimerRef.current);
+          callCleanupTimerRef.current = null;
+        }
+        const status = Number(event?.status ?? 0);
+        const rawCaller = String(event?.callerName || event?.data || '').replace(/[|:]/g, '').trim();
+        const caller = rawCaller.slice(0, 18);
+
+        setCallStatus(status);
+        if (caller) {
+          setCallerDisplay(caller);
+        } else if (status === 0) {
+          setCallerDisplay("");
+        }
+
+        sendToHelmet(`$CALL:${status}:${caller}`).catch(() => {});
+
+        if (status === 3 || status === 5) {
+          const delayMs = status === 5 ? 4000 : 3000;
+          callCleanupTimerRef.current = setTimeout(() => {
+            setCallStatus(0);
+            setCallerDisplay("");
+            sendToHelmet("$CALL:0:").catch(() => {});
+          }, delayMs);
+        }
     });
-    return () => { if(sub) sub.remove(); };
-  }, []);
+    return () => {
+      if (sub) sub.remove();
+      if (callCleanupTimerRef.current) clearTimeout(callCleanupTimerRef.current);
+    };
+  }, [sendToHelmet]);
 
   // 1. Assistente Vocale Navigation (TTS)
   useVoiceAssistant({
@@ -949,6 +982,8 @@ export default function HomeScreen() {
                       const cleanNumber = number.replace(/[\s()-]/g, ''); 
                       console.log(`📞 Contatto trovato: ${contact.name} -> ${cleanNumber}`);
                       Toast.show({ type: 'success', text1: 'Chiamata in corso', text2: `${contact.name}` });
+                      const safeName = String(contact.name || cleanNumber).replace(/[|:]/g, '').slice(0, 18);
+                      sendToHelmet(`$CALL:4:${safeName}`).catch(() => {});
                       CallModule.makeCall(cleanNumber);
                    } else {
                      Toast.show({ type: 'error', text1: 'Contatto senza numero', text2: contact.name });
@@ -1516,14 +1551,74 @@ export default function HomeScreen() {
         </>
       )}
 
-      {/* PHONE STATUS ICON */}
+      {/* PHONE CALL COMPACT SECONDARY BANNER */}
       {callStatus > 0 && (
-        <View style={[styles.phoneStatusIcon, { backgroundColor: callStatus === 3 ? '#E74C3C' : '#2ECC71' }]}>
-             <Feather 
-                name={callStatus === 1 ? "phone-incoming" : (callStatus === 2 ? "phone-call" : "phone-off")} 
-                size={22} 
-                color="white" 
-             />
+        <View
+          style={[
+            styles.phoneStatusBanner,
+            {
+              borderColor:
+                callStatus === 3 || callStatus === 5 ? "#E74C3C" : "#2ECC71",
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.phoneStatusBadge,
+              {
+                backgroundColor:
+                  callStatus === 3 || callStatus === 5 ? "#E74C3C" : "#2ECC71",
+              },
+            ]}
+          >
+            <Feather
+              name={
+                callStatus === 1
+                  ? "phone-incoming"
+                  : callStatus === 2
+                  ? "phone-call"
+                  : callStatus === 4
+                  ? "phone-forwarded"
+                  : callStatus === 5
+                  ? "phone-missed"
+                  : "phone-off"
+              }
+              size={16}
+              color="white"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.phoneStatusTitle} numberOfLines={1}>
+              {callStatus === 1
+                ? "Chiamata in arrivo"
+                : callStatus === 2
+                ? "Chiamata in corso"
+                : callStatus === 4
+                ? "Chiamata in uscita..."
+                : callStatus === 5
+                ? "Chiamata persa"
+                : "Chiamata terminata"}
+            </Text>
+            <Text style={styles.phoneStatusCaller} numberOfLines={1}>
+              {callerDisplay || "Sconosciuto"}
+            </Text>
+          </View>
+          {callStatus === 1 && (
+            <TouchableOpacity
+              onPress={() => CallModule.answerCall()}
+              style={[styles.phoneActionBtn, { backgroundColor: "#2ECC71" }]}
+            >
+              <Feather name="phone" size={14} color="white" />
+            </TouchableOpacity>
+          )}
+          {(callStatus === 1 || callStatus === 2 || callStatus === 4) && (
+            <TouchableOpacity
+              onPress={() => CallModule.hangUp()}
+              style={[styles.phoneActionBtn, { backgroundColor: "#E74C3C" }]}
+            >
+              <Feather name="phone-off" size={14} color="white" />
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -1638,18 +1733,47 @@ const createStyles = (colors: any) =>
       borderColor: colors.card,
     },
 
-    phoneStatusIcon: {
+    phoneStatusBanner: {
       position: "absolute",
-      top: 135,
-      left: 20,
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: "#2ECC71", // Green default
+      top: 196,
+      left: 16,
+      right: 90,
+      backgroundColor: "rgba(13, 19, 32, 0.94)",
+      borderRadius: 16,
+      borderWidth: 1.5,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      elevation: 10,
+      zIndex: 999,
+    },
+    phoneStatusBadge: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       justifyContent: "center",
       alignItems: "center",
-      elevation: 8,
-      zIndex: 999 
+    },
+    phoneStatusTitle: {
+      color: "#94A3B8",
+      fontSize: 10,
+      fontWeight: "700",
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    phoneStatusCaller: {
+      color: "#F8FAFC",
+      fontSize: 14,
+      fontWeight: "800",
+    },
+    phoneActionBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      justifyContent: "center",
+      alignItems: "center",
     },
 
     demoFab: {

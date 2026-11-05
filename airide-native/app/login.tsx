@@ -29,7 +29,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>AirRide</Text>
+      <Text style={styles.title}>AiRide</Text>
 
       <Text style={styles.label}>Email</Text>
       <TextInput

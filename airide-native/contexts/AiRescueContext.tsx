@@ -1,6 +1,6 @@
 // contexts/AiRescueContext.tsx
 import React, { createContext, useContext, useEffect, useState, useRef } from "react";
-import { View, Text, TouchableOpacity, Modal, StyleSheet, Alert } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import { Accelerometer } from "expo-sensors";
 import * as Location from "expo-location";
 import { useAuth } from "../services/useAuth";
@@ -11,6 +11,7 @@ import Feather from "@expo/vector-icons/Feather";
 import { sendEmergencyCall } from "../services/api";
 import { DeviceEventEmitter, NativeModules, PermissionsAndroid, Platform } from "react-native";
 import { BackgroundNavigation } from "../services/BackgroundNavigation";
+import { bleService } from "../services/BleSingleton";
 
 type AiRescueContextType = {
   isCrashDetected: boolean;
@@ -87,6 +88,7 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
     setIsCrashDetected(true);
     setCountdown(30);
     setIsSending(false);
+    bleService.sendHudCommand("SOS:30").catch(() => {});
     
     // TTS
     ttsService.speak("Incidente rilevato. Stai bene?", VoicePriority.CRITICAL);
@@ -118,8 +120,15 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
   };
 
   // Quando il countdown arriva a 0 → invio emergenza (fuori dal render)
+  // Inoltre mantiene sincronizzato il countdown sull'HUD del casco ogni 5s
   useEffect(() => {
-    if (!isCrashDetected || countdown !== 0 || sendingRef.current) return;
+    if (!isCrashDetected) return;
+
+    if (countdown > 0 && countdown < 30 && countdown % 5 === 0) {
+      bleService.sendHudCommand(`SOS:${countdown}`).catch(() => {});
+    }
+
+    if (countdown !== 0 || sendingRef.current) return;
 
     if (countdownTimer.current) {
       clearInterval(countdownTimer.current);
@@ -127,6 +136,7 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
     }
     sendingRef.current = true;
     setIsSending(true);
+    bleService.sendHudCommand("SOS:SENT").catch(() => {});
     sendEmergencyMessage();
   }, [countdown, isCrashDetected]);
 
@@ -142,6 +152,8 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
         sttListener.current = null;
     }
     BackgroundNavigation.disableEmergencySTT();
+    // Invia conferma di annullamento falso positivo all'HUD del casco
+    bleService.sendHudCommand("SOS:OK").catch(() => {});
     
     ttsService.speak("Allarme annullato. Riprendi il viaggio in sicurezza.", VoicePriority.HIGH);
     setIsCrashDetected(false);
@@ -217,26 +229,35 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
   return (
     <AiRescueContext.Provider value={{ isCrashDetected }}>
       {children}
-      <Modal visible={isCrashDetected} transparent={true} animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Feather name="alert-triangle" size={80} color="#E85A2A" style={{ marginBottom: 20 }} />
-            <Text style={styles.title}>INCIDENTE RILEVATO</Text>
-            <Text style={styles.subtitle}>Invio messaggio di emergenza a:</Text>
-            <Text style={styles.contact}>{contact || "Nessun contatto impostato!"}</Text>
-            
-            <Text style={styles.timer}>{countdown}</Text>
-            
-            {!isSending ? (
+      {isCrashDetected && (
+        <View style={styles.bannerWrapper} pointerEvents="box-none">
+          <View style={styles.bannerCard}>
+            <View style={styles.timerBadge}>
+              <Text style={styles.timer}>{countdown}s</Text>
+            </View>
+
+            <View style={styles.infoColumn}>
+              <View style={styles.headerRow}>
+                <Feather name="alert-triangle" size={14} color="#E85A2A" />
+                <Text style={styles.title} numberOfLines={1}>
+                  AIRESCUE • URTO RILEVATO
+                </Text>
+              </View>
+              <Text style={styles.subtitle} numberOfLines={1}>
+                {isSending
+                  ? "Invio SOS in corso..."
+                  : `SOS a ${contact || "contatto"} • Dì "STO BENE"`}
+              </Text>
+            </View>
+
+            {!isSending && (
               <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
                 <Text style={styles.cancelText}>STO BENE</Text>
               </TouchableOpacity>
-            ) : (
-              <Text style={styles.subtitle}>Invio in corso...</Text>
             )}
           </View>
         </View>
-      </Modal>
+      )}
     </AiRescueContext.Provider>
   );
 };
@@ -244,58 +265,76 @@ export const AiRescueProvider = ({ children }: { children: React.ReactNode }) =>
 export const useAiRescue = () => useContext(AiRescueContext);
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
+  bannerWrapper: {
+    position: "absolute",
+    top: 118,
+    left: 14,
+    right: 14,
+    zIndex: 9999,
+    elevation: 20,
+  },
+  bannerCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(15, 20, 32, 0.96)",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: "#E85A2A",
+    gap: 10,
+    shadowColor: "#E85A2A",
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  timerBadge: {
+    minWidth: 48,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "rgba(232, 90, 42, 0.18)",
+    borderWidth: 1,
+    borderColor: "#E85A2A",
     justifyContent: "center",
     alignItems: "center",
-  },
-  modalContent: {
-    width: "85%",
-    backgroundColor: "#111",
-    padding: 30,
-    borderRadius: 20,
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#E85A2A"
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 10,
-    textAlign: "center"
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#aaa",
-    marginBottom: 5,
-    textAlign: "center"
-  },
-  contact: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#E85A2A",
-    marginBottom: 30,
-    textAlign: "center"
+    paddingHorizontal: 6,
   },
   timer: {
-    fontSize: 72,
-    fontWeight: "bold",
+    fontSize: 18,
+    fontWeight: "900",
     color: "#E85A2A",
-    marginBottom: 40,
+  },
+  infoColumn: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 2,
+  },
+  title: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  subtitle: {
+    fontSize: 11,
+    color: "#CBD5E1",
+    fontWeight: "600",
   },
   cancelButton: {
     backgroundColor: "#E85A2A",
-    paddingVertical: 18,
-    paddingHorizontal: 40,
-    borderRadius: 15,
-    width: "100%",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
   },
   cancelText: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "bold",
-    textAlign: "center",
-  }
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0.4,
+  },
 });

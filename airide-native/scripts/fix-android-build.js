@@ -154,4 +154,38 @@ patchFile('expo-dev-menu/android/build.gradle', [
 ]);
 
 
+// 5. Fix RNBackgroundActionsTask notification staying alive when user closes the app
+patchFile('react-native-background-actions/android/src/main/java/com/asterinet/react/bgactions/RNBackgroundActionsTask.java', [
+    {
+        search: /startForeground\(SERVICE_NOTIFICATION_ID, notification\);\s*return super\.onStartCommand\(intent, flags, startId\);\s*\}\s*private void createNotificationChannel/,
+        replace: `startForeground(SERVICE_NOTIFICATION_ID, notification);
+        return super.onStartCommand(intent, flags, startId);
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        super.onTaskRemoved(rootIntent);
+        stopForeground(true);
+        final NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager != null) {
+            notificationManager.cancel(SERVICE_NOTIFICATION_ID);
+        }
+        stopSelf();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        stopForeground(true);
+        final NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager != null) {
+            notificationManager.cancel(SERVICE_NOTIFICATION_ID);
+        }
+    }
+
+    private void createNotificationChannel`,
+        description: 'Stop foreground service and cancel notification on task removal / destroy'
+    }
+]);
+
 console.log('--- Fixes Applied Successfully ---');
